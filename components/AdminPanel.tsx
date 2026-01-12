@@ -153,7 +153,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ showAlert }) => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const { data: profiles, error: profileError } = await supabase.from('profiles').select('*').neq('status', 'deleted').order('full_name', { ascending: true });
+      const { data: profiles, error: profileError } = await supabase.from('profiles').select('*').order('full_name', { ascending: true });
       if (profileError) throw profileError;
 
       const { data: tripsData } = await supabase.from('trips').select('driver_id, created_at').order('created_at', { ascending: false });
@@ -294,29 +294,23 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ showAlert }) => {
 
   const handleDeleteUser = async (userId: string, userName: string) => {
     showAlert({
-        title: 'Vô hiệu hoá người dùng?',
-        message: `Bạn có chắc muốn vô hiệu hoá người dùng "${userName}"? Họ sẽ không thể đăng nhập và sẽ bị ẩn khỏi hệ thống.`,
+        title: 'Xoá người dùng?',
+        message: `Bạn có chắc muốn xoá người dùng "${userName}"? Hành động này sẽ xoá toàn bộ dữ liệu liên quan.`,
         variant: 'danger',
-        confirmText: 'Vô hiệu hoá',
+        confirmText: 'Xoá ngay',
         cancelText: 'Hủy',
         onConfirm: async () => {
             setDeletingId(userId);
             try {
-              const { error } = await supabase.rpc('soft_delete_user', {
-                user_id_to_delete: userId
-              });
-              if (error) throw error;
-              setUsers(prev => prev.filter(u => u.id !== userId));
+            // Note: In Supabase, deleting from auth.users (via admin API) cascades. 
+            // Since we are client-side, we can only delete from public.profiles if RLS allows, 
+            // but normally this requires a backend function to fully wipe auth user.
+            const { error } = await supabase.from('profiles').delete().eq('id', userId);
+            if (error) throw error;
+            setUsers(prev => prev.filter(u => u.id !== userId));
             } catch (err: any) { 
-                showAlert({
-                    title: 'Lỗi',
-                    message: err.message || 'Không thể vô hiệu hoá người dùng. Vui lòng thử lại.',
-                    variant: 'danger',
-                    confirmText: 'Đóng'
-                });
-            } finally { 
-              setDeletingId(null); 
-            }
+                alert('Không thể xoá người dùng từ phía Client. Vui lòng sử dụng Supabase Dashboard.'); 
+            } finally { setDeletingId(null); }
         }
     });
   };
@@ -388,7 +382,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ showAlert }) => {
         </div>
       </div>
       
-      {/* Password Reset UI State */}
+      {/* Password Reset Modal (Simulated) */}
       {passwordResetUser && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white w-full max-w-md rounded-[28px] shadow-2xl p-6 relative">

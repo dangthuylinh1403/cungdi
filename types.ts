@@ -10,7 +10,6 @@ export interface Profile {
   avatar_url?: string;
   // Mã người dùng ngắn gọn để tra cứu nhanh
   user_code?: string; 
-  status?: 'active' | 'locked' | 'deleted';
 }
 
 export enum TripStatus {
