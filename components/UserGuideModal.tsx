@@ -13,7 +13,14 @@ interface UserGuideModalProps {
 }
 
 // Reusable UI components for the guide
-const StatusBadge = ({ icon: Icon, label, style, description }: {icon: React.ElementType, label: string, style: string, description: string}) => (
+interface StatusBadgeProps {
+  icon: React.ElementType;
+  label: string;
+  style: string;
+  description: string;
+}
+
+const StatusBadge: React.FC<StatusBadgeProps> = ({ icon: Icon, label, style, description }) => (
   <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-lg transition-all duration-300 group">
     <div className="mb-3 flex justify-between items-center">
       <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg border text-[9px] font-bold ${style}`}>
@@ -26,7 +33,7 @@ const StatusBadge = ({ icon: Icon, label, style, description }: {icon: React.Ele
   </div>
 );
 
-const GuideSection = ({ title, description, icon: Icon, children, borderColor = 'border-emerald-500' }: {title: string, description: string, icon: React.ElementType, children: React.ReactNode, borderColor?: string}) => (
+const GuideSection = ({ title, description, icon: Icon, children, borderColor = 'border-emerald-500' }: {title: string, description: string, icon: React.ElementType, children?: React.ReactNode, borderColor?: string}) => (
   <section className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-500">
     <div className={`flex items-start gap-4 border-l-4 ${borderColor} pl-5`}>
       <div className={`mt-1 p-2 rounded-xl bg-slate-100 ${borderColor.replace('border-', 'text-')}`}>
@@ -43,7 +50,7 @@ const GuideSection = ({ title, description, icon: Icon, children, borderColor = 
   </section>
 );
 
-const Step = ({ number, title, children }: {number: string | number, title: string, children: React.ReactNode}) => (
+const Step = ({ number, title, children }: {number: string | number, title: string, children?: React.ReactNode}) => (
   <div className="flex items-start gap-4">
     <div className="w-7 h-7 rounded-xl bg-slate-800 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-lg">{number}</div>
     <div className="flex-1 pt-0.5">
@@ -63,10 +70,12 @@ const TripStatusGuide = () => (
         { label: 'Hoàn thành', icon: CheckCircle2, style: 'bg-emerald-50 text-emerald-600 border-emerald-100', description: 'Tự động kích hoạt sau giờ dự kiến đến. Chuyến đi kết thúc, không nhận khách nữa.' },
         { label: 'Huỷ', icon: XCircle, style: 'bg-rose-50 text-rose-500 border-rose-100', description: 'Do tài xế hoặc quản trị viên chủ động hủy vì lý do khách quan.' },
       ].map((status, idx) => (
-        // FIX: Reverted to using spread props to resolve a potential toolchain/linter issue with explicit props.
         <StatusBadge
           key={idx}
-          {...status}
+          icon={status.icon}
+          label={status.label}
+          style={status.style}
+          description={status.description}
         />
       ))}
     </div>
@@ -79,10 +88,12 @@ const BookingStatusGuide = () => (
         { label: 'Xác nhận', icon: CheckCircle2, style: 'bg-emerald-50 text-emerald-600 border-emerald-100', description: 'Tài xế đã đồng ý đón. Hệ thống tự động trừ số ghế trống trên chuyến.' },
         { label: 'Huỷ', icon: XCircle, style: 'bg-rose-50 text-rose-500 border-rose-100', description: 'Hành khách hoặc tài xế đã hủy đơn. Nếu đơn đã xác nhận, ghế sẽ được hoàn lại.' },
       ].map((status, idx) => (
-        // FIX: Reverted to using spread props to resolve a potential toolchain/linter issue with explicit props.
         <StatusBadge
           key={idx}
-          {...status}
+          icon={status.icon}
+          label={status.label}
+          style={status.style}
+          description={status.description}
         />
       ))}
     </div>
@@ -91,7 +102,6 @@ const BookingStatusGuide = () => (
 // --- Role-specific Content ---
 const UserContent = () => (
   <div className="space-y-10">
-    {/* FIX: Wrapped content inside GuideSection and Step components to provide 'children' prop. */}
     <GuideSection title="Tìm kiếm & Đặt chỗ" description="Khám phá các chuyến đi phù hợp hoặc tạo yêu cầu của riêng bạn." icon={Search} borderColor="border-sky-500">
       <Step number={1} title="Tìm kiếm chuyến xe có sẵn">
         <p>Tại tab <b className="text-emerald-600">"Chuyến xe có sẵn"</b>, bạn có thể tìm các chuyến do tài xế đăng. Sử dụng thanh tìm kiếm (hỗ trợ không dấu) và các bộ lọc (Loại xe, Điểm đi, Điểm đến) để tìm chuyến đi phù hợp nhất.</p>
@@ -111,7 +121,6 @@ const UserContent = () => (
 
 const DriverContent = () => (
     <div className="space-y-10">
-    {/* FIX: Wrapped content inside GuideSection and Step components to provide 'children' prop. */}
     <GuideSection title="Đăng & Quản lý chuyến xe" description="Tạo và quản lý các chuyến đi của bạn một cách hiệu quả." icon={Car} borderColor="border-emerald-500">
       <Step number={1} title="Quản lý đội xe">
         <p>Trước tiên, vào <b className="text-slate-700">Hồ sơ &gt; Quản lý đội xe</b> để thêm các phương tiện bạn sở hữu. Thông tin này sẽ được sử dụng khi đăng chuyến.</p>
@@ -138,7 +147,6 @@ const DriverContent = () => (
 
 const StaffContent = ({ role }: { role: 'manager' | 'admin' }) => (
     <div className="space-y-10">
-    {/* FIX: Wrapped content inside GuideSection and Step components to provide 'children' prop. */}
     <GuideSection title="Tổng quan & Giám sát" description="Theo dõi sức khỏe toàn bộ hệ thống và các chỉ số quan trọng." icon={LayoutDashboard} borderColor={role === 'admin' ? 'border-rose-500' : 'border-indigo-500'}>
       <p className="text-xs text-slate-600">Tab <b className={role === 'admin' ? 'text-rose-600' : 'text-indigo-600'}>"Thống kê"</b> cung cấp cho bạn cái nhìn toàn cảnh về doanh thu, số lượng chuyến xe, và tỷ lệ lấp đầy. Đây là công cụ chính để đánh giá hiệu quả hoạt động.</p>
     </GuideSection>

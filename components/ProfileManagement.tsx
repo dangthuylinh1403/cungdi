@@ -4,7 +4,7 @@ import {
   User, Phone, ShieldCheck, Save, Loader2, Clock, 
   CheckCircle2, Navigation, Ticket, ArrowRight, AlertCircle, 
   History, Calendar, LucideIcon, Bookmark, Camera, Car, Shield, Settings, X, Sparkles, MapPin, Copy, LogOut,
-  Timer, Play, Ban, Map as MapIcon, Database, UploadCloud
+  Timer, Play, Ban, Map as MapIcon, Database, UploadCloud, Lock, Key, Mail, AlertTriangle, Link
 } from 'lucide-react';
 import { Profile, UserRole, Trip, Booking } from '../types';
 import { supabase } from '../lib/supabase';
@@ -54,13 +54,20 @@ create policy "Public Delete Avatars" on storage.objects for delete using ( buck
 
 const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, profile, onUpdate, stats, allTrips, userBookings, onManageVehicles }) => {
   const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false); // State upload avatar
+  const [uploading, setUploading] = useState(false); 
   const [fullName, setFullName] = useState(profile?.full_name || '');
   const [phone, setPhone] = useState(profile?.phone || '');
+  const [email, setEmail] = useState('');
+  const [originalEmail, setOriginalEmail] = useState('');
+  
+  // Password Change State
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
   const [activeFilter, setActiveFilter] = useState<'all' | 'trip' | 'booking'>('all');
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   
-  // State xử lý lỗi Bucket Avatar
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [showAvatarFix, setShowAvatarFix] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
@@ -72,8 +79,15 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
     if (profile) {
       setFullName(profile.full_name);
       setPhone(profile.phone || '');
+      // Fetch User Email securely
+      supabase.auth.getUser().then(({ data }) => {
+        if (data.user?.email) {
+            setEmail(data.user.email);
+            setOriginalEmail(data.user.email);
+        }
+      });
     }
-  }, [profile]);
+  }, [profile, isOpen]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -136,14 +150,42 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
     setLoading(true);
     setMessage(null);
     try {
+      // 1. Update Profile Info (Public Metadata)
       const { error } = await supabase
         .from('profiles')
         .update({ full_name: fullName, phone: phone })
         .eq('id', profile.id);
       if (error) throw error;
-      setMessage({ type: 'success', text: 'Đã lưu thay đổi!' });
+
+      let authUpdates: any = {};
+      let successMsg = 'Cập nhật thông tin thành công!';
+
+      // 2. Update Email (Account Linking)
+      if (email && email !== originalEmail) {
+         authUpdates.email = email;
+         successMsg += ' Vui lòng kiểm tra hộp thư mới để xác nhận liên kết Email.';
+      }
+
+      // 3. Update Password
+      if (newPassword) {
+        if (newPassword.length < 6) throw new Error('Mật khẩu mới phải có ít nhất 6 ký tự');
+        if (newPassword !== confirmPassword) throw new Error('Mật khẩu xác nhận không khớp');
+        authUpdates.password = newPassword;
+      }
+
+      if (Object.keys(authUpdates).length > 0) {
+         const { error: authError } = await supabase.auth.updateUser(authUpdates);
+         if (authError) throw authError;
+      }
+
+      setMessage({ type: 'success', text: successMsg });
+      setNewPassword('');
+      setConfirmPassword('');
+      setIsChangingPassword(false);
+      if (email !== originalEmail) setOriginalEmail(email); // Optimistic update
+      
       onUpdate();
-      setTimeout(() => setMessage(null), 3000);
+      setTimeout(() => setMessage(null), 5000);
     } catch (err: any) {
       setMessage({ type: 'error', text: err.message || 'Đã có lỗi xảy ra.' });
     } finally {
@@ -151,9 +193,6 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
     }
   };
 
-  // --- Xử lý Avatar ---
-  
-  // 1. Cắt ảnh 1:1 và Nén
   const processAndCompressImage = (file: File): Promise<File> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -164,12 +203,11 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
           const ctx = canvas.getContext('2d');
           if (!ctx) { reject(new Error('Canvas error')); return; }
 
-          // Cắt hình vuông từ tâm
           const size = Math.min(img.width, img.height);
           const startX = (img.width - size) / 2;
           const startY = (img.height - size) / 2;
 
-          const MAX_DIMENSION = 512; // Avatar không cần quá lớn (512px là đủ đẹp)
+          const MAX_DIMENSION = 512;
           canvas.width = MAX_DIMENSION;
           canvas.height = MAX_DIMENSION;
 
@@ -180,7 +218,6 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
             
             const croppedFile = new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() });
 
-            // Nén xuống ~100KB - 200KB cho avatar
             const options = {
               maxSizeMB: 0.15,
               maxWidthOrHeight: 512,
@@ -205,7 +242,6 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
     });
   };
 
-  // 2. Upload lên Supabase
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!profile || !event.target.files || event.target.files.length === 0) return;
     
@@ -218,20 +254,17 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
       const processedFile = await processAndCompressImage(originalFile);
 
       const fileExt = 'jpg';
-      const fileName = `${profile.id}-${Date.now()}.${fileExt}`; // Thêm timestamp để tránh cache
+      const fileName = `${profile.id}-${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
 
-      // Upload file
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, processedFile, { upsert: true });
 
       if (uploadError) throw uploadError;
 
-      // Lấy URL public
       const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
       
-      // Cập nhật profile
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ avatar_url: data.publicUrl })
@@ -239,7 +272,7 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
 
       if (updateError) throw updateError;
 
-      onUpdate(); // Refresh lại dữ liệu user
+      onUpdate(); 
       setMessage({ type: 'success', text: 'Cập nhật ảnh đại diện thành công!' });
 
     } catch (error: any) {
@@ -254,7 +287,6 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
       }
     } finally {
       setUploading(false);
-      // Reset input value để cho phép chọn lại cùng 1 file nếu cần
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -279,6 +311,7 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
   const userCode = `C${profile?.id.substring(0, 5).toUpperCase() || '00000'}`;
   const roleInfo = getRoleBadgeConfig(profile?.role);
   const RoleIcon = roleInfo.icon;
+  const isPhoneUser = !originalEmail; // Simplistic check: If no email loaded initially, assume phone user
 
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
@@ -286,7 +319,6 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
         ref={modalRef}
         className="bg-[#F8FAFC] w-full max-w-4xl h-[85vh] md:h-auto md:max-h-[90vh] rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-300 flex flex-col relative border border-white"
       >
-        {/* Compact Header */}
         <div className="h-32 bg-gradient-to-r from-emerald-50/80 via-white/90 to-indigo-50/80 relative shrink-0 border-b border-emerald-50">
            <button 
             onClick={onClose} 
@@ -298,13 +330,10 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
           <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
         </div>
 
-        {/* Body Content */}
         <div className="flex-1 overflow-y-auto custom-scrollbar -mt-28 pt-16 px-6 pb-8 relative z-10">
           
-          {/* Main Profile Card */}
           <div className="bg-white rounded-[24px] shadow-sm border border-slate-100 p-5 md:p-6 flex flex-col md:flex-row items-center md:items-end gap-5 md:gap-8 mb-6 relative">
              
-             {/* Avatar Floating */}
              <div className="w-24 h-24 md:w-28 md:h-28 rounded-[28px] bg-white p-1 shadow-lg shrink-0 -mt-16 md:-mt-0 md:absolute md:-top-12 md:left-6">
                 <div 
                   className="w-full h-full rounded-[24px] bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-4xl font-bold text-slate-300 border border-slate-100 overflow-hidden relative group cursor-pointer"
@@ -336,14 +365,11 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
                 </div>
              </div>
 
-             {/* Spacing for Desktop Avatar */}
              <div className="hidden md:block w-28 shrink-0"></div>
 
-             {/* Info Section */}
              <div className="flex-1 text-center md:text-left min-w-0 w-full">
                 <h2 className="text-2xl font-black text-slate-800 tracking-tight mb-3 truncate">{profile?.full_name}</h2>
                 
-                {/* Badges Row */}
                 <div className="flex flex-wrap justify-center md:justify-start gap-2.5">
                    <div className={`px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1.5 border ${roleInfo.bg} ${roleInfo.text} ${roleInfo.border}`}>
                       <RoleIcon size={12} /> {roleInfo.label}
@@ -364,7 +390,6 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
                 </div>
              </div>
 
-             {/* Compact Stats */}
              <div className="flex gap-3 shrink-0">
                 <div className="bg-slate-50 px-4 py-2 rounded-2xl border border-slate-200 text-center min-w-[70px]">
                    <p className="text-[10px] text-slate-500 font-bold uppercase">Chuyến đi</p>
@@ -377,7 +402,6 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
              </div>
           </div>
 
-          {/* Error Bucket Display */}
           {showAvatarFix && (
             <div className="mb-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl animate-in fade-in slide-in-from-top-2">
               <div className="flex items-center gap-2 mb-2 text-rose-600 font-bold text-sm">
@@ -415,12 +439,11 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
-            {/* Left Col: Settings */}
             <div className="lg:col-span-5 space-y-4">
                <div className="bg-white p-5 rounded-[24px] border border-slate-100 shadow-sm">
                   <div className="flex items-center gap-2 mb-4">
                      <Settings size={16} className="text-indigo-500" />
-                     <h3 className="text-sm font-bold text-slate-800">Thông tin cá nhân</h3>
+                     <h3 className="text-sm font-bold text-slate-800">Cài đặt tài khoản</h3>
                   </div>
                   
                   <form onSubmit={handleUpdate} className="space-y-3">
@@ -430,6 +453,14 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
                         }`}>
                            {message.type === 'success' ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
                            {message.text}
+                        </div>
+                     )}
+
+                     {/* Link Email Warning for Phone Users */}
+                     {isPhoneUser && (
+                        <div className="bg-amber-50 border border-amber-100 p-3 rounded-xl text-[10px] text-amber-800 flex flex-col gap-2">
+                           <div className="flex items-center gap-2 font-bold"><Link size={12}/> Liên kết Email</div>
+                           <p>Bạn đang đăng nhập bằng Số điện thoại. Vui lòng thêm Email để có thể tự khôi phục mật khẩu nếu quên.</p>
                         </div>
                      )}
 
@@ -446,6 +477,59 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
                            type="tel" value={phone} onChange={e => setPhone(e.target.value)}
                            className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-emerald-200 focus:ring-4 focus:ring-emerald-50 transition-all"
                         />
+                     </div>
+                     
+                     {/* Email Linking Field */}
+                     <div>
+                        <label className="text-[10px] font-bold text-slate-400 ml-1 mb-1 block flex justify-between">
+                           Email (Dùng để đăng nhập & Khôi phục)
+                           {email && email === originalEmail && <span className="text-emerald-500 flex items-center gap-1"><CheckCircle2 size={10}/> Đã xác thực</span>}
+                        </label>
+                        <div className="relative">
+                           <input 
+                              type="email" value={email} onChange={e => setEmail(e.target.value)}
+                              placeholder="nhap@email.com"
+                              className={`w-full pl-9 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-emerald-200 focus:ring-4 focus:ring-emerald-50 transition-all ${isPhoneUser ? 'border-amber-200 bg-amber-50 focus:border-amber-400 focus:ring-amber-100' : ''}`}
+                           />
+                           <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        </div>
+                     </div>
+
+                     {/* Password Change Section */}
+                     <div className="pt-2">
+                        <button 
+                           type="button"
+                           onClick={() => setIsChangingPassword(!isChangingPassword)}
+                           className="flex items-center gap-2 text-[11px] font-bold text-slate-500 hover:text-indigo-600 transition-colors mb-2 ml-1"
+                        >
+                           {isChangingPassword ? <X size={12} /> : <Key size={12} />}
+                           {isChangingPassword ? 'Hủy đổi mật khẩu' : 'Đổi mật khẩu'}
+                        </button>
+                        
+                        {isChangingPassword && (
+                           <div className="space-y-3 bg-slate-50 p-3 rounded-xl border border-slate-100 animate-in slide-in-from-top-2">
+                              <div>
+                                 <label className="text-[10px] font-bold text-slate-400 mb-1 block">Mật khẩu mới</label>
+                                 <input 
+                                    type="password" 
+                                    value={newPassword}
+                                    onChange={e => setNewPassword(e.target.value)}
+                                    placeholder="Ít nhất 6 ký tự"
+                                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-300 transition-all"
+                                 />
+                              </div>
+                              <div>
+                                 <label className="text-[10px] font-bold text-slate-400 mb-1 block">Xác nhận mật khẩu</label>
+                                 <input 
+                                    type="password" 
+                                    value={confirmPassword}
+                                    onChange={e => setConfirmPassword(e.target.value)}
+                                    placeholder="Nhập lại mật khẩu"
+                                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-300 transition-all"
+                                 />
+                              </div>
+                           </div>
+                        )}
                      </div>
 
                      <button 
@@ -478,7 +562,6 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
                </button>
             </div>
 
-            {/* Right Col: Activity */}
             <div className="lg:col-span-7">
                <div className="bg-white p-5 rounded-[24px] border border-slate-100 shadow-sm h-full flex flex-col">
                   <div className="flex items-center justify-between mb-4">
@@ -502,7 +585,6 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
                   <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 relative min-h-[300px]">
                      <div className="absolute left-[19px] top-3 bottom-3 w-0.5 bg-slate-100"></div>
                      {activities.length > 0 ? activities.map((item) => {
-                        // Use shared helpers for status display
                         const isTrip = item.type === 'trip';
                         let statusConfig;
                         

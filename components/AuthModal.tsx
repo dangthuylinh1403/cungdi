@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Mail, Lock, User, Phone, Loader2, LogIn, UserPlus, Smartphone, History, Trash2, ArrowRight } from 'lucide-react';
+import { X, Mail, Lock, User, Phone, Loader2, LogIn, UserPlus, Smartphone, History, Trash2, ArrowRight, KeyRound, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface AuthModalProps {
@@ -12,9 +12,11 @@ interface AuthModalProps {
 const RECENT_LOGINS_KEY = 'tripease_recent_logins';
 
 const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const [isLogin, setIsLogin] = useState(true);
+  // view: 'login' | 'register' | 'forgot'
+  const [view, setView] = useState<'login' | 'register' | 'forgot'>('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   
   const [identifier, setIdentifier] = useState('0825846888'); 
   const [password, setPassword] = useState('123123');
@@ -36,16 +38,22 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
 
   useEffect(() => {
     // Attempt auto-login for the test user when the modal is opened in login mode
-    if (isOpen && isLogin && identifier === '0825846888' && !autoLoginAttempted.current) {
+    if (isOpen && view === 'login' && identifier === '0825846888' && !autoLoginAttempted.current) {
       autoLoginAttempted.current = true;
       handleAuth(new Event('submit') as any); // Trigger login
     }
-  }, [isOpen, isLogin, identifier]); // Add isLogin and identifier to dependencies
+  }, [isOpen, view, identifier]);
 
   const saveToRecent = (val: string) => {
     const updated = [val, ...recentLogins.filter(i => i !== val)].slice(0, 3);
     setRecentLogins(updated);
     localStorage.setItem(RECENT_LOGINS_KEY, JSON.stringify(updated));
+  };
+
+  const resetState = () => {
+    setError('');
+    setSuccessMsg('');
+    setLoading(false);
   };
 
   if (!isOpen) return null;
@@ -63,12 +71,26 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
     if (e && e.preventDefault) e.preventDefault();
     setLoading(true);
     setError('');
+    setSuccessMsg('');
 
     try {
       const isMail = isEmail(identifier);
       const finalIdentifier = isMail ? identifier.trim() : formatPhoneNumber(identifier);
 
-      if (isLogin) {
+      if (view === 'forgot') {
+        if (!isMail) {
+            throw new Error('Vui lòng nhập địa chỉ Email để khôi phục mật khẩu.');
+        }
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(finalIdentifier, {
+            redirectTo: window.location.origin,
+        });
+        if (resetError) throw resetError;
+        setSuccessMsg('Đã gửi email khôi phục! Vui lòng kiểm tra hộp thư (cả mục Spam).');
+        setLoading(false);
+        return;
+      }
+
+      if (view === 'login') {
         const credentials = isMail 
           ? { email: finalIdentifier, password } 
           : { phone: finalIdentifier, password };
@@ -98,9 +120,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
       let errorMsg = err.message;
       if (errorMsg.includes('E.164')) errorMsg = 'Số điện thoại không đúng định dạng.';
       else if (errorMsg.includes('Invalid login credentials')) errorMsg = 'Thông tin đăng nhập không chính xác.';
+      else if (errorMsg.includes('User not found')) errorMsg = 'Tài khoản không tồn tại.';
       setError(errorMsg || 'Đã có lỗi xảy ra.');
     } finally {
-      setLoading(false);
+      if (view !== 'forgot') setLoading(false);
     }
   };
 
@@ -117,60 +140,85 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
 
         <div className="pt-10 pb-6 px-8 text-center relative">
           <div className="inline-flex items-center justify-center w-14 h-14 bg-indigo-50 rounded-2xl mb-4 border border-indigo-100 shadow-sm">
-            <div className="w-7 h-7 rounded-full border-4 border-indigo-600 relative">
-               <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-400 rounded-full border-2 border-white"></div>
+            <div className="w-7 h-7 rounded-full border-4 border-indigo-600 relative flex items-center justify-center">
+               {view === 'forgot' ? (
+                 <KeyRound size={16} className="text-indigo-600" />
+               ) : (
+                 <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-400 rounded-full border-2 border-white"></div>
+               )}
             </div>
           </div>
           <h3 className="text-2xl font-bold text-slate-900 tracking-tight">
-            {loading && identifier === '0825846888' ? 'Đang tự động đăng nhập...' : 'Chào mừng tới Chung đường'}
+            {view === 'forgot' ? 'Khôi phục mật khẩu' : loading && identifier === '0825846888' ? 'Đang tự động đăng nhập...' : 'Chào mừng tới Chung đường'}
           </h3>
-          <p className="text-slate-500 text-[11px] mt-2 font-normal uppercase tracking-wider">Hệ thống xe tiện chuyến thông minh</p>
+          <p className="text-slate-500 text-[11px] mt-2 font-normal uppercase tracking-wider">
+            {view === 'forgot' ? 'Nhập email để nhận hướng dẫn' : 'Hệ thống xe tiện chuyến thông minh'}
+          </p>
         </div>
 
-        <div className="flex px-8 mb-8 relative">
-          <button 
-            type="button"
-            onClick={() => setIsLogin(true)}
-            className={`flex-1 py-3 text-sm font-bold transition-all relative z-10 ${isLogin ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
-          >
-            Đăng nhập
-            {isLogin && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-full animate-in slide-in-from-left-2"></div>}
-          </button>
-          <button 
-            type="button"
-            onClick={() => setIsLogin(false)}
-            className={`flex-1 py-3 text-sm font-bold transition-all relative z-10 ${!isLogin ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
-          >
-            Đăng ký
-            {!isLogin && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-full animate-in slide-in-from-right-2"></div>}
-          </button>
-          <div className="absolute bottom-0 left-8 right-8 h-px bg-slate-100"></div>
-        </div>
+        {view !== 'forgot' && (
+            <div className="flex px-8 mb-8 relative">
+            <button 
+                type="button"
+                onClick={() => { setView('login'); resetState(); }}
+                className={`flex-1 py-3 text-sm font-bold transition-all relative z-10 ${view === 'login' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+                Đăng nhập
+                {view === 'login' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-full animate-in slide-in-from-left-2"></div>}
+            </button>
+            <button 
+                type="button"
+                onClick={() => { setView('register'); resetState(); }}
+                className={`flex-1 py-3 text-sm font-bold transition-all relative z-10 ${view === 'register' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+                Đăng ký
+                {view === 'register' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-full animate-in slide-in-from-right-2"></div>}
+            </button>
+            <div className="absolute bottom-0 left-8 right-8 h-px bg-slate-100"></div>
+            </div>
+        )}
 
         <form onSubmit={handleAuth} className="px-8 pb-10 space-y-4">
           {error && (
-            <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-rose-600 text-xs font-normal text-center">
+            <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-rose-600 text-xs font-normal text-center flex items-center justify-center gap-2">
               {error}
+            </div>
+          )}
+          {successMsg && (
+            <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-emerald-600 text-xs font-bold text-center flex items-center justify-center gap-2">
+              <CheckCircle2 size={16} /> {successMsg}
             </div>
           )}
 
           <div className="space-y-1.5">
-            <label className="text-[11px] font-normal text-slate-400 ml-1">Tài khoản</label>
+            <label className="text-[11px] font-normal text-slate-400 ml-1">
+                {view === 'forgot' ? 'Email đăng ký' : 'Tài khoản (Email / SĐT)'}
+            </label>
             <input 
               type="text" required value={identifier} onChange={(e) => setIdentifier(e.target.value)}
+              placeholder={view === 'forgot' ? "nhap@email.com" : ""}
               className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-indigo-400 focus:bg-white outline-none font-normal text-slate-800 transition-all text-sm"
             />
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-normal text-slate-400 ml-1">Mật khẩu</label>
-            <input 
-              type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-indigo-400 focus:bg-white outline-none font-normal text-slate-800 transition-all text-sm"
-            />
-          </div>
+          {view !== 'forgot' && (
+            <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                    <label className="text-[11px] font-normal text-slate-400 ml-1">Mật khẩu</label>
+                    {view === 'login' && (
+                        <button type="button" onClick={() => { setView('forgot'); resetState(); setIdentifier(''); }} className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 hover:underline">
+                            Quên mật khẩu?
+                        </button>
+                    )}
+                </div>
+                <input 
+                type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-indigo-400 focus:bg-white outline-none font-normal text-slate-800 transition-all text-sm"
+                />
+            </div>
+          )}
 
-          {!isLogin && (
+          {view === 'register' && (
             <div className="space-y-1.5">
               <label className="text-[11px] font-normal text-slate-400 ml-1">Họ và tên</label>
               <input 
@@ -183,11 +231,17 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
 
           <button 
             type="submit" disabled={loading}
-            className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold text-sm flex items-center justify-center gap-3 shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-[0.98] mt-6"
+            className={`w-full py-4 text-white rounded-2xl font-bold text-sm flex items-center justify-center gap-3 shadow-xl transition-all active:scale-[0.98] mt-6 ${view === 'forgot' ? 'bg-slate-800 hover:bg-slate-900 shadow-slate-200' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'}`}
           >
-            {loading ? <Loader2 className="animate-spin" size={18} /> : (isLogin ? 'Đăng nhập ngay' : 'Tạo tài khoản')}
+            {loading ? <Loader2 className="animate-spin" size={18} /> : (view === 'login' ? 'Đăng nhập ngay' : view === 'register' ? 'Tạo tài khoản' : 'Gửi email khôi phục')}
             {!loading && <ArrowRight size={16} />}
           </button>
+
+          {view === 'forgot' && (
+             <button type="button" onClick={() => { setView('login'); resetState(); }} className="w-full py-2 text-slate-500 font-bold text-xs hover:text-slate-800">
+                Quay lại đăng nhập
+             </button>
+          )}
         </form>
       </div>
     </div>

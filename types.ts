@@ -3,12 +3,14 @@ export type UserRole = 'admin' | 'manager' | 'driver' | 'user';
 
 export interface Profile {
   id: string;
+  email?: string;
   full_name: string;
   phone: string;
   role: UserRole;
   avatar_url?: string;
   // Mã người dùng ngắn gọn để tra cứu nhanh
   user_code?: string; 
+  status?: 'active' | 'locked' | 'deleted';
 }
 
 export enum TripStatus {

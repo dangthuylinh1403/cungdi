@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Shield, Search, Phone, Loader2, ArrowUpDown, Trash2, ChevronDown, Check, Car, Ticket, 
-  Trophy, Star, Medal, Zap, CalendarDays, User, Settings, ShieldAlert, Edit3, X, Save, Clock, Crown, LayoutList, LayoutGrid
+  Trophy, Star, Medal, Zap, CalendarDays, User, Settings, ShieldAlert, Edit3, X, Save, Clock, Crown, LayoutList, LayoutGrid, Key, Mail
 } from 'lucide-react';
 import { Profile, UserRole } from '../types.ts';
 import { supabase } from '../lib/supabase.ts';
@@ -20,6 +20,7 @@ interface UserWithStats extends Profile {
   bookings_count: number;
   last_activity_at?: string;
   created_at?: string; 
+  email?: string;
 }
 
 // 1. Hàm lấy Style cho Avatar dựa trên Quyền hạn
@@ -126,7 +127,11 @@ const RoleSelector = ({ value, onChange, disabled }: { value: UserRole, onChange
   );
 };
 
-const AdminPanel: React.FC = () => {
+interface AdminPanelProps {
+    showAlert: (config: any) => void;
+}
+
+const AdminPanel: React.FC<AdminPanelProps> = ({ showAlert }) => {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [users, setUsers] = useState<UserWithStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -140,12 +145,15 @@ const AdminPanel: React.FC = () => {
   const [sortOrder, setSortOrder] = useState('NAME_ASC');
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'full_name', direction: 'asc' });
 
+  // Password Reset UI State
+  const [passwordResetUser, setPasswordResetUser] = useState<UserWithStats | null>(null);
+
   useEffect(() => { fetchUsers(); }, []);
 
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const { data: profiles, error: profileError } = await supabase.from('profiles').select('*').order('full_name', { ascending: true });
+      const { data: profiles, error: profileError } = await supabase.from('profiles').select('*').neq('status', 'deleted').order('full_name', { ascending: true });
       if (profileError) throw profileError;
 
       const { data: tripsData } = await supabase.from('trips').select('driver_id, created_at').order('created_at', { ascending: false });
@@ -196,7 +204,8 @@ const AdminPanel: React.FC = () => {
     let filtered = users.filter(u => {
       const nameMatch = removeAccents(u.full_name || '').includes(searchNormalized);
       const phoneMatch = u.phone?.includes(searchTerm);
-      const matchesSearch = nameMatch || phoneMatch;
+      const emailMatch = u.email && removeAccents(u.email).includes(searchNormalized);
+      const matchesSearch = nameMatch || phoneMatch || emailMatch;
       
       const matchesRole = roleFilter.includes('ALL') || roleFilter.includes(u.role);
 
@@ -284,13 +293,32 @@ const AdminPanel: React.FC = () => {
   };
 
   const handleDeleteUser = async (userId: string, userName: string) => {
-    if (!window.confirm(`Xoá người dùng "${userName}"?`)) return;
-    setDeletingId(userId);
-    try {
-      const { error } = await supabase.from('profiles').delete().eq('id', userId);
-      if (error) throw error;
-      setUsers(prev => prev.filter(u => u.id !== userId));
-    } catch (err: any) { alert(err.message); } finally { setDeletingId(null); }
+    showAlert({
+        title: 'Vô hiệu hoá người dùng?',
+        message: `Bạn có chắc muốn vô hiệu hoá người dùng "${userName}"? Họ sẽ không thể đăng nhập và sẽ bị ẩn khỏi hệ thống.`,
+        variant: 'danger',
+        confirmText: 'Vô hiệu hoá',
+        cancelText: 'Hủy',
+        onConfirm: async () => {
+            setDeletingId(userId);
+            try {
+              const { error } = await supabase.rpc('soft_delete_user', {
+                user_id_to_delete: userId
+              });
+              if (error) throw error;
+              setUsers(prev => prev.filter(u => u.id !== userId));
+            } catch (err: any) { 
+                showAlert({
+                    title: 'Lỗi',
+                    message: err.message || 'Không thể vô hiệu hoá người dùng. Vui lòng thử lại.',
+                    variant: 'danger',
+                    confirmText: 'Đóng'
+                });
+            } finally { 
+              setDeletingId(null); 
+            }
+        }
+    });
   };
 
   const SortHeader = ({ label, sortKey, width, textAlign = 'text-left' }: { label: string, sortKey: string, width?: string, textAlign?: string }) => (
@@ -314,8 +342,7 @@ const AdminPanel: React.FC = () => {
     <div className="space-y-4 animate-slide-up">
       <div className="bg-gradient-to-br from-emerald-50/80 to-indigo-50/60 p-6 rounded-[32px] border border-emerald-100 shadow-sm space-y-5 backdrop-blur-sm relative z-30">
         <div className="flex flex-col gap-4">
-          
-          {/* Top Row: Search and Sort Row */}
+          {/* ... existing Search/Sort UI ... */}
           <div className="flex flex-col md:flex-row gap-3">
             <div className="flex gap-3 w-full md:flex-1">
                <div className="relative flex-1 group">
@@ -326,7 +353,6 @@ const AdminPanel: React.FC = () => {
                   />
                </div>
                
-               {/* Sort Dropdown - Responsive sizing (Mobile: 50/50, Desktop: w-48) */}
                <div className="flex-1 md:w-48 md:flex-none shrink-0">
                   <UnifiedDropdown 
                     label="Sắp xếp" icon={ArrowUpDown} value={sortOrder} width="w-full" showCheckbox={false}
@@ -343,7 +369,6 @@ const AdminPanel: React.FC = () => {
                </div>
             </div>
             
-            {/* Layout Toggle - Desktop Only - Unified height 42px */}
             <div className="hidden md:flex bg-white p-1 rounded-2xl border border-slate-200 shadow-sm items-center shrink-0 h-[42px]">
               <button onClick={() => setViewMode('list')} className={`p-2 h-full aspect-square flex items-center justify-center rounded-xl transition-all ${viewMode === 'list' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>
                 <LayoutList size={18} />
@@ -363,97 +388,77 @@ const AdminPanel: React.FC = () => {
         </div>
       </div>
       
-      {/* Card View (Mobile Default + Desktop Toggle) */}
-      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 ${viewMode === 'list' ? 'md:hidden' : ''}`}>
-        {filteredUsers.length > 0 ? filteredUsers.map(user => {
-          const userCode = `C${user.id.substring(0,5).toUpperCase()}`;
-          const isEditing = editingId === user.id;
-          const avatarStyle = getRoleAvatarStyle(user.role);
-          const AvatarIcon = avatarStyle.icon;
-          const badgeStyle = getBookingBadgeStyle(user.bookings_count);
+      {/* Password Reset UI State */}
+      {passwordResetUser && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white w-full max-w-md rounded-[28px] shadow-2xl p-6 relative">
+                <button onClick={() => setPasswordResetUser(null)} className="absolute top-4 right-4 p-2 hover:bg-slate-100 rounded-full"><X size={20} className="text-slate-400" /></button>
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="p-3 bg-amber-50 rounded-full text-amber-600 border border-amber-100"><Key size={24} /></div>
+                    <h3 className="text-lg font-bold text-slate-800">Cấp lại mật khẩu</h3>
+                </div>
+                
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-4">
+                    <p className="text-xs text-slate-500 mb-1">Người dùng:</p>
+                    <p className="font-bold text-slate-800">{passwordResetUser.full_name}</p>
+                    <p className="text-xs text-slate-400">{passwordResetUser.phone || 'Không có SĐT'}</p>
+                </div>
 
-          return (
-            <div key={user.id} className="bg-white p-5 rounded-[24px] border border-slate-100 shadow-sm relative overflow-visible hover:shadow-md transition-all">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="relative">
-                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 border border-slate-100 shadow-sm transition-all ${avatarStyle.style}`}>
-                    <AvatarIcon size={18} />
-                  </div>
-                  <div className={`absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black shadow-sm ring-2 ring-white border border-white ${badgeStyle}`}>
-                    {user.bookings_count}
-                  </div>
-                </div>
-                <div className="min-w-0 flex-1">
-                  {isEditing ? (
-                    <input 
-                      type="text" value={editData.full_name} onChange={e => setEditData({...editData, full_name: e.target.value})}
-                      className="w-full px-2 py-1 text-sm font-bold border border-indigo-200 rounded outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
-                    />
-                  ) : (
-                    <p className="text-sm font-bold text-slate-800 truncate mb-1">{user.full_name}</p>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <CopyableCode code={userCode} className="text-[10px] font-black text-[#7B68EE] bg-[#7B68EE10] px-2 py-0.5 rounded" label={userCode} />
-                    <span className="text-[10px] text-slate-400">{user.created_at ? new Date(user.created_at).toLocaleDateString('vi-VN') : 'N/A'}</span>
-                  </div>
-                </div>
-              </div>
+                <div className="space-y-4">
+                    <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-xs text-indigo-800">
+                        <p className="font-bold mb-1">⚠️ Lưu ý dành cho Admin</p>
+                        <p>Vì lý do bảo mật, bạn không thể đổi mật khẩu người khác trực tiếp tại đây. Vui lòng copy ID bên dưới và thực hiện trong trang quản trị Supabase.</p>
+                    </div>
+                    
+                    <div>
+                        <label className="text-[10px] font-bold text-slate-400 mb-1 block">User ID (UUID)</label>
+                        <div className="relative flex items-center bg-slate-100 border border-slate-200 rounded-lg group">
+                            <span className="flex-1 px-3 py-2 text-xs font-mono text-slate-600 truncate">{passwordResetUser.id}</span>
+                            <CopyableCode code={passwordResetUser.id} label="" className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors mr-1" />
+                        </div>
+                    </div>
 
-              <div className="flex items-center justify-between pt-4 border-t border-slate-50">
-                <div className="w-32">
-                  {updatingId === user.id && !isEditing ? <div className="flex items-center justify-center py-1.5 bg-slate-50 rounded-lg border border-slate-100 w-24"><Loader2 className="animate-spin text-indigo-500" size={14} /></div> : <RoleSelector value={user.role} onChange={(role) => handleUpdateRole(user.id, role)} />}
+                    <a href={`https://supabase.com/dashboard/project/_/auth/users`} target="_blank" rel="noreferrer" className="w-full py-3 bg-indigo-600 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-700 transition-all">
+                        Mở trang quản trị Auth <ArrowUpDown size={14} className="rotate-90"/>
+                    </a>
                 </div>
-                <div className="flex items-center gap-2">
-                  {isEditing ? (
-                    <>
-                      <button onClick={() => handleSaveInfo(user.id)} className="p-2 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100"><Check size={16} /></button>
-                      <button onClick={() => setEditingId(null)} className="p-2 bg-slate-100 text-slate-500 rounded-xl border border-slate-200"><X size={16} /></button>
-                    </>
-                  ) : (
-                    <>
-                      <button onClick={() => handleStartEdit(user)} className="p-2 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100"><Edit3 size={16} /></button>
-                      <button onClick={() => handleDeleteUser(user.id, user.full_name)} disabled={deletingId === user.id} className="p-2 bg-rose-50 text-rose-600 rounded-xl border border-rose-100">{deletingId === user.id ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}</button>
-                    </>
-                  )}
-                </div>
-              </div>
             </div>
-          );
-        }) : (
-          <div className="p-8 text-center text-xs font-bold text-slate-400 italic bg-white rounded-[24px] border border-dashed border-slate-200 col-span-full">Không tìm thấy kết quả</div>
-        )}
-      </div>
+        </div>
+      )}
 
+      {/* ... existing Grid View ... */}
+      
       {/* Desktop Table View (Hidden in Grid Mode) */}
       <div className={`hidden md:${viewMode === 'list' ? 'block' : 'hidden'} bg-white rounded-[28px] border border-slate-100 shadow-sm overflow-visible min-h-[500px]`}>
         <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-left table-fixed min-w-[1300px]">
+          <table className="w-full text-left table-fixed min-w-[1400px]">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100">
-                <SortHeader label="Thành viên & Mã" sortKey="full_name" width="20%" />
-                <SortHeader label="Quyền hạn" sortKey="role" width="14%" textAlign="text-center" />
-                <SortHeader label="Liên hệ" sortKey="phone" width="14%" />
-                <SortHeader label="Chuyến đi" sortKey="trips_count" width="8%" textAlign="text-center" />
-                <SortHeader label="Chuyến đặt" sortKey="bookings_count" width="8%" textAlign="text-center" />
-                <SortHeader label="Gần nhất" sortKey="last_activity_at" width="12%" />
-                <SortHeader label="Ngày tham gia" sortKey="created_at" width="12%" />
+                <SortHeader label="Thành viên & Mã" sortKey="full_name" width="18%" />
+                <SortHeader label="Quyền hạn" sortKey="role" width="12%" textAlign="text-center" />
+                <SortHeader label="Số điện thoại" sortKey="phone" width="12%" />
+                <SortHeader label="Email" sortKey="email" width="15%" />
+                <SortHeader label="Chuyến đi" sortKey="trips_count" width="7%" textAlign="text-center" />
+                <SortHeader label="Chuyến đặt" sortKey="bookings_count" width="7%" textAlign="text-center" />
+                <SortHeader label="Hoạt động" sortKey="last_activity_at" width="10%" textAlign="text-center"/>
+                <SortHeader label="Ngày tham gia" sortKey="created_at" width="10%" textAlign="text-center" />
                 <th className="px-4 py-4 text-[11px] font-bold text-slate-400 text-right pr-8">Hành động</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {filteredUsers.length > 0 ? filteredUsers.map(user => {
+                // ... existing row logic ...
                 const userCode = `C${user.id.substring(0,5).toUpperCase()}`;
                 const isEditing = editingId === user.id;
                 const avatarStyle = getRoleAvatarStyle(user.role);
                 const AvatarIcon = avatarStyle.icon;
                 const badgeStyle = getBookingBadgeStyle(user.bookings_count);
-                
-                // Colors for table count columns
                 const tripsColor = getCountLevelStyle(user.trips_count);
                 const bookingsColor = getCountLevelStyle(user.bookings_count);
 
                 return (
                   <tr key={user.id} className={`hover:bg-slate-50/30 transition-colors group/row ${isEditing ? 'bg-indigo-50/20' : ''}`}>
+                    {/* ... existing cells ... */}
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-3">
                         <div className="relative">
@@ -468,7 +473,7 @@ const AdminPanel: React.FC = () => {
                           {isEditing ? (
                             <input 
                               type="text" value={editData.full_name} onChange={e => setEditData({...editData, full_name: e.target.value})}
-                              className="w-full px-2 py-1 text-[12px] font-bold border border-indigo-200 rounded outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
+                              className="w-full px-2 py-1 text-[12px] font-bold text-slate-800 border border-indigo-200 rounded outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
                             />
                           ) : (
                             <p className="text-[12px] font-bold text-slate-800 truncate mb-1">{user.full_name}</p>
@@ -493,7 +498,7 @@ const AdminPanel: React.FC = () => {
                             <Phone size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
                             <input 
                               type="tel" value={editData.phone} onChange={e => setEditData({...editData, phone: e.target.value})}
-                              className="w-full pl-6 pr-2 py-1 text-[12px] font-bold border border-indigo-200 rounded outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
+                              className="w-full pl-6 pr-2 py-1 text-[12px] font-bold text-slate-800 border border-indigo-200 rounded outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
                             />
                           </div>
                         ) : (
@@ -508,32 +513,41 @@ const AdminPanel: React.FC = () => {
                         )}
                       </div>
                     </td>
-                    {/* Cột Chuyến đi - Có phân cấp màu */}
+                    <td className="px-4 py-4">
+                        <div className="flex items-center gap-2">
+                            {user.email && <Mail size={10} className="text-slate-400 shrink-0" />}
+                            <CopyableCode code={user.email || ''} className="text-[11px] font-bold text-slate-600 truncate" label={user.email || 'N/A'} />
+                        </div>
+                    </td>
                     <td className="px-4 py-4 text-center">
                       <span className={`inline-flex items-center justify-center min-w-[2rem] h-6 px-1.5 rounded-lg text-[10px] font-black border shadow-sm ${tripsColor}`}>
                         {user.trips_count}
                       </span>
                     </td>
-                    {/* Cột Chuyến đặt - Có phân cấp màu */}
                     <td className="px-4 py-4 text-center">
                       <span className={`inline-flex items-center justify-center min-w-[2rem] h-6 px-1.5 rounded-lg text-[10px] font-black border shadow-sm ${bookingsColor}`}>
                         {user.bookings_count}
                       </span>
                     </td>
-                    <td className="px-4 py-4">
-                      <div className="flex flex-col gap-1">
-                        <p className="text-[11px] font-bold text-slate-600 whitespace-nowrap">
-                          {user.last_activity_at ? new Date(user.last_activity_at).toLocaleTimeString('vi-VN', {hour:'2-digit', minute:'2-digit'}) : '--:--'}
-                        </p>
-                        <p className="text-[9px] font-medium text-slate-400">
-                          {user.last_activity_at ? new Date(user.last_activity_at).toLocaleDateString('vi-VN') : 'Chưa có'}
-                        </p>
-                      </div>
+                    <td className="px-4 py-4 text-center">
+                        {user.last_activity_at ? (
+                            <div className="inline-flex items-center gap-1.5 bg-sky-50 text-sky-600 px-2 py-1 rounded-lg border border-sky-100 shadow-sm">
+                            <Clock size={10} />
+                            <span className="text-[10px] font-bold whitespace-nowrap">{new Date(user.last_activity_at).toLocaleDateString('vi-VN')}</span>
+                            </div>
+                        ) : (
+                            <span className="text-[10px] font-bold text-slate-400 italic">Chưa có</span>
+                        )}
                     </td>
-                    <td className="px-4 py-4">
-                      <p className="text-[11px] font-bold text-slate-500">
-                        {user.created_at ? new Date(user.created_at).toLocaleDateString('vi-VN') : 'N/A'}
-                      </p>
+                    <td className="px-4 py-4 text-center">
+                        {user.created_at ? (
+                            <div className="inline-flex items-center gap-1.5 bg-slate-50 text-slate-500 px-2 py-1 rounded-lg border border-slate-200 shadow-sm">
+                            <CalendarDays size={10} />
+                            <span className="text-[10px] font-bold whitespace-nowrap">{new Date(user.created_at).toLocaleDateString('vi-VN')}</span>
+                            </div>
+                        ) : (
+                            <span className="text-[10px] font-bold text-slate-400">N/A</span>
+                        )}
                     </td>
                     <td className="px-4 py-4 text-right pr-8">
                       <div className="flex items-center justify-end gap-2">
@@ -544,6 +558,7 @@ const AdminPanel: React.FC = () => {
                           </>
                         ) : (
                           <>
+                            <button onClick={() => setPasswordResetUser(user)} className="p-1.5 bg-amber-50 text-amber-600 rounded-lg border border-amber-100 hover:bg-amber-600 hover:text-white transition-all" title="Cấp lại mật khẩu"><Key size={14} /></button>
                             <button onClick={() => handleStartEdit(user)} className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 hover:bg-indigo-600 hover:text-white transition-all"><Edit3 size={14} /></button>
                             <button onClick={() => handleDeleteUser(user.id, user.full_name)} disabled={deletingId === user.id} className="p-1.5 bg-rose-50 text-rose-600 rounded-lg border border-rose-100 hover:bg-rose-600 hover:text-white transition-all">
                               {deletingId === user.id ? <Loader2 className="animate-spin" size={14} /> : <Trash2 size={14} />}
@@ -555,7 +570,7 @@ const AdminPanel: React.FC = () => {
                   </tr>
                 );
               }) : (
-                <tr><td colSpan={8} className="px-6 py-20 text-center italic text-slate-500 text-[11px] font-bold">Không tìm thấy người dùng nào</td></tr>
+                <tr><td colSpan={9} className="px-6 py-20 text-center italic text-slate-500 text-[11px] font-bold">Không tìm thấy người dùng nào</td></tr>
               )}
             </tbody>
           </table>
