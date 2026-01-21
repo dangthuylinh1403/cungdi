@@ -18,13 +18,11 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   
-  const [identifier, setIdentifier] = useState('0825846888'); 
-  const [password, setPassword] = useState('123123');
+  const [identifier, setIdentifier] = useState(''); 
+  const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [recentLogins, setRecentLogins] = useState<string[]>([]);
   
-  const autoLoginAttempted = useRef(false);
-
   useEffect(() => {
     const saved = localStorage.getItem(RECENT_LOGINS_KEY);
     if (saved) {
@@ -35,14 +33,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
       }
     }
   }, [isOpen]);
-
-  useEffect(() => {
-    // Attempt auto-login for the test user when the modal is opened in login mode
-    if (isOpen && view === 'login' && identifier === '0825846888' && !autoLoginAttempted.current) {
-      autoLoginAttempted.current = true;
-      handleAuth(new Event('submit') as any); // Trigger login
-    }
-  }, [isOpen, view, identifier]);
 
   const saveToRecent = (val: string) => {
     const updated = [val, ...recentLogins.filter(i => i !== val)].slice(0, 3);
@@ -116,7 +106,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
       onSuccess();
       onClose();
     } catch (err: any) {
-      autoLoginAttempted.current = false; 
       let errorMsg = err.message;
       if (errorMsg.includes('E.164')) errorMsg = 'Số điện thoại không đúng định dạng.';
       else if (errorMsg.includes('Invalid login credentials')) errorMsg = 'Thông tin đăng nhập không chính xác.';
@@ -149,7 +138,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
             </div>
           </div>
           <h3 className="text-2xl font-bold text-slate-900 tracking-tight">
-            {view === 'forgot' ? 'Khôi phục mật khẩu' : loading && identifier === '0825846888' ? 'Đang tự động đăng nhập...' : 'Chào mừng tới Chung đường'}
+            {view === 'forgot' ? 'Khôi phục mật khẩu' : 'Chào mừng tới Cùng đi'}
           </h3>
           <p className="text-slate-500 text-[11px] mt-2 font-normal uppercase tracking-wider">
             {view === 'forgot' ? 'Nhập email để nhận hướng dẫn' : 'Hệ thống xe tiện chuyến thông minh'}

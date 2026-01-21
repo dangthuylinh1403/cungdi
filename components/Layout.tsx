@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   LayoutDashboard, Search, PlusCircle, Ticket, Bell, LogOut, Car, LogIn, Settings, ClipboardList, ShoppingBag, Users as UsersIcon, User, X, ChevronUp, MoreHorizontal, Shield, HelpCircle, CheckCircle2, AlertCircle, Grid, Menu, Plus, FileText
@@ -143,7 +144,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, noti
 
   const activeItem = allPossibleItems.find(item => item.id === activeTab);
   const ActiveIcon = activeItem?.icon || Car;
-  const activeLabel = activeItem?.label || 'Chung đường';
+  const activeLabel = activeItem?.label || 'Cùng đi';
 
   const MobileNavItem = ({ id, icon: Icon, label, onClick, isActive, isMain = false, hasBadge = false }: any) => (
     <button 
@@ -183,7 +184,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, noti
             <Car className="text-white w-5 h-5" />
           </div>
           <span className="text-xl font-bold tracking-tight text-slate-900">
-            Chung đường<span className="text-emerald-600">.</span>
+            Cùng đi<span className="text-emerald-600">.</span>
           </span>
         </button>
         
