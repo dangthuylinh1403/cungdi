@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Phone, User, MapPin, Users, CreditCard, AlertCircle, CheckCircle2, Sparkles, Info, Navigation, Calendar, Clock, ArrowRight, Car, Map, ShieldCheck, Wifi, Snowflake, Droplets, Star, Award, Copy, GripVertical, Crown, Check, Search, Ticket, Wallet, MessageSquare, ChevronDown, Play, Timer, Zap } from 'lucide-react';
 import { Trip, Profile, TripStatus } from '../types';
 import CopyableCode from './CopyableCode';
 import { getVehicleConfig, getTripStatusDisplay } from './SearchTrips';
 import { LOCAL_LOCATIONS } from '../services/locationData';
+import { supabase } from '../lib/supabase';
 
 interface BookingModalProps {
   trip: Trip;
@@ -38,6 +40,8 @@ const BookingModal: React.FC<BookingModalProps> = ({ trip, profile, isOpen, onCl
   const [showPickupSuggestions, setShowPickupSuggestions] = useState(false);
   const [showDropoffSuggestions, setShowDropoffSuggestions] = useState(false);
   const [showSeatPicker, setShowSeatPicker] = useState(false);
+  
+  const [vehicleImage, setVehicleImage] = useState<string | null>(null);
 
   const isRequest = trip.is_request;
 
@@ -57,6 +61,32 @@ const BookingModal: React.FC<BookingModalProps> = ({ trip, profile, isOpen, onCl
       setDropoffDetail('');
       setSeats(isRequest ? trip.seats : 1);
       document.body.style.overflow = 'hidden';
+      
+      // Fetch Vehicle Image logic
+      if (!trip.is_request && trip.vehicle_info) {
+        const parts = trip.vehicle_info.split(' (');
+        if (parts.length > 1) {
+            const plate = parts[1].replace(')', '').trim();
+            const fetchImage = async () => {
+                const { data } = await supabase
+                    .from('vehicles')
+                    .select('image_url')
+                    .eq('license_plate', plate)
+                    .maybeSingle();
+                if (data?.image_url) {
+                    setVehicleImage(data.image_url);
+                } else {
+                    setVehicleImage(null);
+                }
+            };
+            fetchImage();
+        } else {
+            setVehicleImage(null);
+        }
+      } else {
+        setVehicleImage(null);
+      }
+
     }
     return () => {
       document.body.style.overflow = 'unset';
@@ -327,7 +357,13 @@ const BookingModal: React.FC<BookingModalProps> = ({ trip, profile, isOpen, onCl
             </div>
             <div className="h-px bg-slate-100 w-full"></div>
             <div className="flex gap-4">
-               <div className="w-20 h-12 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0"><Car size={20} className="text-slate-300" /></div>
+               <div className="w-20 h-12 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden relative">
+                  {vehicleImage ? (
+                    <img src={vehicleImage} alt="Xe" className="w-full h-full object-cover" />
+                  ) : (
+                    <Car size={20} className="text-slate-300" />
+                  )}
+               </div>
                <div className="flex-1">
                   <p className="text-xs font-bold text-slate-800 mb-1">Tiện ích trên xe</p>
                   <div className="flex flex-wrap gap-1.5">
