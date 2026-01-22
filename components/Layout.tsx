@@ -358,6 +358,27 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, noti
                 </div>
               )}
             </div>
+
+            {/* Mobile Profile/Login Button - Always visible on Header for Mobile */}
+            <button
+                type="button"
+                onClick={profile ? onProfileClick : onLoginClick}
+                className="xl:hidden p-1 rounded-xl hover:bg-white transition-all ml-1"
+            >
+                {profile ? (
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center text-white font-bold text-xs shadow-md shadow-emerald-200 border-2 border-white">
+                        {profile.avatar_url ? (
+                            <img src={profile.avatar_url} alt="Profile" className="w-full h-full rounded-xl object-cover" />
+                        ) : (
+                            profile.full_name?.charAt(0).toUpperCase() || 'U'
+                        )}
+                    </div>
+                ) : (
+                    <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 shadow-sm">
+                        <User size={20} />
+                    </div>
+                )}
+            </button>
           </div>
         </header>
 
@@ -399,6 +420,14 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, noti
                   </button>
                 );
               })}
+              {/* Add Profile Option to Manage Menu for Staff */}
+              <button
+                onClick={() => { onProfileClick(); setShowMobileManageMenu(false); }}
+                className="flex items-center gap-3 w-full px-4 py-3 rounded-xl transition-all hover:bg-slate-50 text-slate-600 border-t border-slate-50 mt-1"
+              >
+                <User size={18} className="text-slate-400" />
+                <span className="text-xs font-bold">Hồ sơ cá nhân</span>
+              </button>
             </div>
           )}
 

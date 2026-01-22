@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Mail, Lock, User, Phone, Loader2, LogIn, UserPlus, Smartphone, History, Trash2, ArrowRight, KeyRound, CheckCircle2 } from 'lucide-react';
+import { X, Mail, Lock, User, Phone, Loader2, LogIn, UserPlus, Smartphone, History, Trash2, ArrowRight, KeyRound, CheckCircle2, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface AuthModalProps {
@@ -23,6 +23,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
   const [fullName, setFullName] = useState('');
   const [recentLogins, setRecentLogins] = useState<string[]>([]);
   
+  const passwordInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     const saved = localStorage.getItem(RECENT_LOGINS_KEY);
     if (saved) {
@@ -35,9 +37,28 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
   }, [isOpen]);
 
   const saveToRecent = (val: string) => {
+    // Chỉ lưu nếu giá trị hợp lệ
+    if (!val || val.trim().length < 3) return;
     const updated = [val, ...recentLogins.filter(i => i !== val)].slice(0, 3);
     setRecentLogins(updated);
     localStorage.setItem(RECENT_LOGINS_KEY, JSON.stringify(updated));
+  };
+
+  const removeRecent = (val: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = recentLogins.filter(i => i !== val);
+    setRecentLogins(updated);
+    localStorage.setItem(RECENT_LOGINS_KEY, JSON.stringify(updated));
+  };
+
+  const handleSelectRecent = (val: string) => {
+    setIdentifier(val);
+    // Focus vào ô mật khẩu sau khi chọn
+    setTimeout(() => {
+        if (passwordInputRef.current) {
+            passwordInputRef.current.focus();
+        }
+    }, 100);
   };
 
   const resetState = () => {
@@ -146,7 +167,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
         </div>
 
         {view !== 'forgot' && (
-            <div className="flex px-8 mb-8 relative">
+            <div className="flex px-8 mb-6 relative">
             <button 
                 type="button"
                 onClick={() => { setView('login'); resetState(); }}
@@ -179,6 +200,41 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
             </div>
           )}
 
+          {/* Recent Logins Suggestion */}
+          {view === 'login' && recentLogins.length > 0 && !identifier && (
+            <div className="mb-4 animate-in slide-in-from-top-2 fade-in">
+              <p className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider flex items-center gap-1">
+                <History size={10} /> Đăng nhập gần đây
+              </p>
+              <div className="space-y-2">
+                {recentLogins.map((loginId) => {
+                  const isMail = isEmail(loginId);
+                  return (
+                    <div 
+                      key={loginId} 
+                      onClick={() => handleSelectRecent(loginId)}
+                      className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50 hover:bg-white hover:shadow-md hover:border-indigo-100 cursor-pointer transition-all group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isMail ? 'bg-orange-50 text-orange-500' : 'bg-emerald-50 text-emerald-500'}`}>
+                          {isMail ? <Mail size={14} /> : <Phone size={14} />}
+                        </div>
+                        <span className="text-xs font-bold text-slate-700">{loginId}</span>
+                      </div>
+                      <button 
+                        onClick={(e) => removeRecent(loginId, e)}
+                        className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                        title="Xóa khỏi danh sách"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <label className="text-[11px] font-normal text-slate-400 ml-1">
                 {view === 'forgot' ? 'Email đăng ký' : 'Tài khoản (Email / SĐT)'}
@@ -201,6 +257,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
                     )}
                 </div>
                 <input 
+                ref={passwordInputRef}
                 type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-indigo-400 focus:bg-white outline-none font-normal text-slate-800 transition-all text-sm"
                 />
