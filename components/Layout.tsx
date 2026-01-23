@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  LayoutDashboard, Search, PlusCircle, Ticket, Bell, LogOut, Car, LogIn, Settings, ClipboardList, ShoppingBag, Users as UsersIcon, User, X, ChevronUp, MoreHorizontal, Shield, HelpCircle, CheckCircle2, AlertCircle, Grid, Menu, Plus, FileText
+  LayoutDashboard, Search, PlusCircle, Ticket, Bell, LogOut, Car, LogIn, Settings, ClipboardList, ShoppingBag, Users as UsersIcon, User, X, ChevronUp, ChevronDown, MoreHorizontal, Shield, HelpCircle, CheckCircle2, AlertCircle, Grid, Menu, Plus, FileText
 } from 'lucide-react';
 import { Notification, Profile, UserRole } from '../types';
 import { supabase } from '../lib/supabase';
@@ -79,7 +79,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, noti
   const [showMobileManageMenu, setShowMobileManageMenu] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
-  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const mainContentRef = useRef<HTMLDivElement>(null);
 
   const isStaff = profile?.role === 'admin' || profile?.role === 'manager' || profile?.role === 'driver';
@@ -94,15 +94,25 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, noti
 
     const handleScroll = () => {
         if (mainEl.scrollTop > 300) {
-            setShowScrollTop(true);
+            setIsScrolled(true);
         } else {
-            setShowScrollTop(false);
+            setIsScrolled(false);
         }
     };
 
     mainEl.addEventListener('scroll', handleScroll);
     return () => mainEl.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const handleScrollAction = () => {
+    if (isScrolled) {
+        // Scroll to Top
+        mainContentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+        // Scroll to Bottom
+        mainContentRef.current?.scrollTo({ top: mainContentRef.current.scrollHeight, behavior: 'smooth' });
+    }
+  };
 
   const scrollToTop = () => {
     mainContentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -297,14 +307,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, noti
           <RoadAnimation />
 
           <div className="flex items-center gap-2">
-            <button 
-              type="button" 
-              onClick={() => setShowUserGuide(true)}
-              className="p-2 sm:p-2.5 text-slate-500 hover:text-emerald-600 hover:bg-white rounded-xl transition-all"
-              title="Hướng dẫn sử dụng"
-            >
-              <HelpCircle size={20} />
-            </button>
+            {/* Help Button removed from header */}
             <div className="relative" ref={notificationRef}>
               <button 
                 type="button" 
@@ -386,15 +389,28 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, noti
           {children}
         </div>
 
-        {showScrollTop && (
+        {/* Floating Action Buttons Container */}
+        <div className="fixed bottom-24 xl:bottom-8 right-4 xl:right-8 z-50 flex flex-col gap-2">
+            {/* Scroll Button */}
             <button
-                onClick={scrollToTop}
-                className="fixed bottom-24 xl:bottom-8 right-4 xl:right-8 z-50 w-10 h-10 bg-emerald-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-emerald-700 transition-all animate-in fade-in zoom-in-95"
-                aria-label="Cuộn lên đầu trang"
+                onClick={handleScrollAction}
+                className="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-emerald-700 transition-all active:scale-90 animate-in fade-in zoom-in-95"
+                aria-label={isScrolled ? "Cuộn lên đầu trang" : "Cuộn xuống cuối trang"}
             >
-                <ChevronUp size={20} />
+                <div className={`transition-transform duration-500 ease-in-out ${isScrolled ? 'rotate-0' : 'rotate-180'}`}>
+                    <ChevronUp size={16} />
+                </div>
             </button>
-        )}
+
+            {/* User Guide Button */}
+            <button
+                onClick={() => setShowUserGuide(true)}
+                className="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-emerald-700 transition-all active:scale-90 animate-in fade-in zoom-in-95"
+                title="Hướng dẫn sử dụng"
+            >
+                <HelpCircle size={16} />
+            </button>
+        </div>
 
         {/* Mobile Navigation - Redesigned Floating Dock */}
         <nav className="xl:hidden fixed bottom-5 left-4 right-4 z-[70] flex justify-center" ref={mobileMenuRef}>

@@ -1,9 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Search as SearchIcon, MapPin, Calendar, Clock, User, ChevronRight, Star, LayoutGrid, CalendarDays, ChevronDown, Car, CarFront, Sparkles, Crown, DollarSign, ArrowUpDown, Filter, Check, X, History, Users, ArrowRight, AlertCircle, Timer, Zap, CheckCircle2, Play, Radio, Shield, Settings, Hash, Navigation, ClipboardList, Repeat, Send, Loader2, Map as MapIcon, Plus, Info, Ban, ListChecks, Ticket } from 'lucide-react';
-import { Trip, TripStatus, Booking, Profile } from '../types.ts';
+import { Search as SearchIcon, MapPin, Calendar, Clock, User, ChevronRight, Star, LayoutGrid, CalendarDays, ChevronDown, Car, CarFront, Sparkles, Crown, DollarSign, ArrowUpDown, Filter, Check, X, History, Users, ArrowRight, AlertCircle, Timer, Zap, CheckCircle2, Play, Radio, Shield, Settings, Hash, Navigation, ClipboardList, Repeat, Send, Loader2, Map as MapIcon, Plus, Info, Ban, ListChecks, Ticket, Layers } from 'lucide-react';
+import { Trip, TripStatus, Booking, Profile } from '../types';
 import CopyableCode from './CopyableCode.tsx';
-import CustomDatePicker from './CustomDatePicker.tsx';
-import CustomTimePicker from './CustomTimePicker.tsx';
 import { getRouteDetails } from '../services/geminiService.ts';
 
 const removeAccents = (str: string) => {
@@ -65,7 +63,7 @@ export const statusFilterOptions = [
   { label: 'Huỷ', value: TripStatus.CANCELLED, icon: X, style: 'bg-rose-50 text-rose-500 border-rose-100' },
 ];
 
-export const UnifiedDropdown = ({ label, icon: Icon, options, value, onChange, placeholder = "Tìm nhanh...", isVehicle = false, isStatus = false, isDriver = false, isRole = false, statusConfig = [], roleConfig = [], width = "w-48", showCheckbox = true }: any) => {
+export const UnifiedDropdown = ({ label, icon: Icon, options, value, onChange, placeholder = "Tìm nhanh...", isVehicle = false, isStatus = false, isDriver = false, isRole = false, statusConfig = [], roleConfig = [], width = "w-48", showCheckbox = true, direction = 'down', mobileIconOnly = false }: any) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -176,17 +174,19 @@ export const UnifiedDropdown = ({ label, icon: Icon, options, value, onChange, p
       <button 
         type="button"
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(!isOpen); }}
-        className={`w-full flex items-center justify-between px-3 h-[42px] bg-white border border-slate-200 rounded-2xl hover:border-emerald-400 transition-all shadow-sm ${isOpen ? 'ring-2 ring-emerald-100 border-emerald-400' : ''}`}
+        className={`w-full flex items-center h-[42px] bg-white border border-slate-200 rounded-2xl hover:border-emerald-400 transition-all shadow-sm ${isOpen ? 'ring-2 ring-emerald-100 border-emerald-400' : ''} ${mobileIconOnly ? 'p-2.5 justify-center md:px-3 md:justify-between' : 'px-3 justify-between'}`}
       >
-        <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+        <div className={`flex items-center min-w-0 overflow-hidden ${mobileIconOnly ? 'gap-0 md:gap-2' : 'gap-2'}`}>
           <Icon size={14} className={(!Array.isArray(value) ? value === 'ALL' : value.includes('ALL')) ? 'text-slate-500' : 'text-emerald-500'} />
-          {renderCurrentLabel()}
+          <div className={mobileIconOnly ? 'hidden md:inline-block' : ''}>
+            {renderCurrentLabel()}
+          </div>
         </div>
-        <ChevronDown size={12} className={`text-slate-500 shrink-0 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown size={12} className={`text-slate-500 shrink-0 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''} ${mobileIconOnly ? 'hidden md:inline-block' : ''}`} />
       </button>
 
       {isOpen && (
-        <div className="absolute top-full mt-2 right-0 min-w-[200px] w-full bg-white border border-slate-100 rounded-[24px] shadow-2xl z-[100] p-2 animate-in fade-in zoom-in-95 duration-200">
+        <div className={`absolute ${direction === 'up' ? 'bottom-full mb-3' : 'top-full mt-2'} right-0 min-w-[200px] w-full bg-white border border-slate-100 rounded-[24px] shadow-2xl z-[100] p-2 animate-in fade-in ${direction === 'up' ? 'zoom-in-95 slide-in-from-bottom-2' : 'zoom-in-95 slide-in-from-top-2'} duration-200`}>
           <div className="relative mb-2 px-1 pt-1">
             <SearchIcon size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
             <input 
@@ -557,7 +557,7 @@ export const TripCard: React.FC<TripCardProps> = ({ trip, onBook, userBookings =
           </div>
           <div className="flex items-center gap-3 relative z-10">
             <div className="w-4 h-4 rounded-full bg-emerald-100/70 flex items-center justify-center shrink-0 border border-emerald-200/50 shadow-lg shadow-emerald-200/50">
-              <div className="w-2 h-2 rounded-full bg-emerald-600 shadow-inner"></div>
+              <div className="w-2 h-2 rounded-full shadow-inner bg-emerald-600"></div>
             </div>
             <div className="flex flex-col">
               <p className="font-bold text-slate-700 text-[12px] truncate">{trip.dest_name}</p>

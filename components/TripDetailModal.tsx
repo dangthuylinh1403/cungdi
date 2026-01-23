@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   X, Car, MapPin, Clock, Users, DollarSign, Calendar, Navigation, CheckCircle2, AlertCircle, Play, Timer, Ban, Phone, ArrowRight, Loader2, ListChecks, LucideIcon, Hash, CarFront, Zap, Crown, Shield, Trash2, Star, Radio, ArrowUpDown, Filter, ShieldCheck, Wifi, Snowflake, Droplets, Search, LayoutList, LayoutGrid, User, Info, MessageSquareQuote, ClipboardList
@@ -504,6 +505,7 @@ const TripDetailModal: React.FC<TripDetailModalProps> = ({ trip, currentBookings
                         // If trip is a request, the "booker" is the driver.
                         const personName = booking.profiles?.full_name || (trip.is_request ? 'Tài xế' : 'Khách vãng lai');
                         const personLabel = trip.is_request ? 'Tài xế nhận' : 'Khách đặt';
+                        const displayPhone = booking.passenger_phone ? booking.passenger_phone.replace(/^\+?84/, '0') : 'N/A';
                         
                         // Formatting & Visuals
                         const depTime = new Date(trip.departure_time).toLocaleTimeString('vi-VN', {hour:'2-digit', minute:'2-digit'});
@@ -625,7 +627,7 @@ const TripDetailModal: React.FC<TripDetailModalProps> = ({ trip, currentBookings
                                                 <Phone size={10} />
                                             </a>
                                         )}
-                                        <CopyableCode code={booking.passenger_phone || ''} className="text-[10px] font-bold text-indigo-600 truncate" label={booking.passenger_phone || 'N/A'} />
+                                        <CopyableCode code={booking.passenger_phone || ''} className="text-[10px] font-bold text-indigo-600 truncate" label={displayPhone} />
                                     </div>
                                 </div>
 
@@ -703,7 +705,7 @@ const TripDetailModal: React.FC<TripDetailModalProps> = ({ trip, currentBookings
 
                               <div className="flex justify-between items-center">
                                 <div className="flex items-center gap-2 text-[10px] font-bold text-indigo-600">
-                                  <Phone size={12} /> {booking.passenger_phone || '---'}
+                                  <Phone size={12} /> {booking.passenger_phone ? booking.passenger_phone.replace(/^\+?84/, '0') : '---'}
                                 </div>
                                 <button 
                                   onClick={() => handleDeleteBooking(booking.id, booking.seats_booked, booking.status)}
@@ -741,6 +743,7 @@ const TripDetailModal: React.FC<TripDetailModalProps> = ({ trip, currentBookings
                               const displayDropoff = dropoff || trip.dest_name;
                               const personName = booking.profiles?.full_name || (trip.is_request ? 'Tài xế' : 'Khách vãng lai');
                               const priceColor = trip.is_request ? 'text-indigo-600' : 'text-emerald-600';
+                              const displayPhone = booking.passenger_phone ? booking.passenger_phone.replace(/^\+?84/, '0') : 'N/A';
 
                               return (
                                 <tr key={booking.id} className="hover:bg-slate-50/50 transition-colors group">
@@ -769,7 +772,7 @@ const TripDetailModal: React.FC<TripDetailModalProps> = ({ trip, currentBookings
                                             <Phone size={10} />
                                           </a>
                                         )}
-                                        <CopyableCode code={booking.passenger_phone || ''} className="text-[10px] font-bold text-indigo-600 truncate" label={booking.passenger_phone || '---'} />
+                                        <CopyableCode code={booking.passenger_phone || ''} className="text-[10px] font-bold text-indigo-600 truncate" label={displayPhone} />
                                       </div>
                                       {message && (
                                         <div className="flex items-start gap-1.5 p-1.5 bg-slate-50 rounded-lg border border-slate-100 max-w-[200px]">

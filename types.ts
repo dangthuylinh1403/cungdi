@@ -1,5 +1,6 @@
 
 export type UserRole = 'admin' | 'manager' | 'driver' | 'user';
+export type MembershipTier = 'standard' | 'silver' | 'gold' | 'diamond' | 'family';
 
 export interface Profile {
   id: string;
@@ -9,7 +10,11 @@ export interface Profile {
   role: UserRole;
   avatar_url?: string;
   // Mã người dùng ngắn gọn để tra cứu nhanh
-  user_code?: string; 
+  user_code?: string;
+  // Cấp độ thành viên
+  membership_tier?: MembershipTier;
+  // Tài xế này có tham gia chương trình giảm giá không
+  is_discount_provider?: boolean;
 }
 
 export enum TripStatus {

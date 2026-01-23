@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  ShoppingBag, Search, CheckCircle2, XCircle, Clock, RefreshCcw, Loader2, ArrowUpDown, Navigation, Car, User, ArrowRight, Phone, DollarSign, ChevronDown, Check, X, AlertCircle, AlertTriangle, Timer, Ban, Calendar, Filter, Hash, Play, MapPin, LayoutList, LayoutGrid, Star, ClipboardList, Info, Users, Layers
+  ShoppingBag, Search, CheckCircle2, XCircle, Clock, RefreshCcw, Loader2, ArrowUpDown, Navigation, Car, User, ArrowRight, Phone, DollarSign, ChevronDown, Check, X, AlertCircle, AlertTriangle, Timer, Ban, Calendar, Filter, Hash, Play, MapPin, LayoutList, LayoutGrid, Star, ClipboardList, Info, Users, Layers, MessageSquareQuote
 } from 'lucide-react';
 import { Booking, Profile, Trip, TripStatus } from '../types';
 import { supabase } from '../lib/supabase';
@@ -448,6 +448,7 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ profile, trips, onRef
           const { pickup, dropoff } = extractLocations(order.note);
           const displayPickup = pickup || trip?.origin_name;
           const displayDropoff = dropoff || trip?.dest_name;
+          const displayPhone = order.passenger_phone ? order.passenger_phone.replace(/^\+?84/, '0') : 'N/A';
 
           return (
             <div key={order.id} className={`bg-white p-4 rounded-[24px] border shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group overflow-hidden relative flex flex-col justify-between h-full ${isOngoing ? 'border-blue-200 bg-blue-50/20' : isUrgent ? 'border-rose-400 bg-rose-50/20' : isPreparing ? 'border-amber-300 bg-amber-50/10' : 'border-slate-100'} ${isFinalStatus ? 'opacity-80' : ''}`} onClick={() => onViewTripDetails(trip)}>
@@ -537,14 +538,14 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ profile, trips, onRef
                 </div>
                 
                 <div className="flex justify-center">
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); onViewTripDetails(trip); }} 
-                      className="px-2 py-1 rounded-lg transition-all border shadow-sm flex items-center gap-1.5 bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-100"
-                      title="Xem chi tiết"
-                    >
-                      <Info size={10} />
-                      <span className="text-[10px] font-bold">Chi tiết</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                        {order.passenger_phone && (
+                            <a href={`tel:${order.passenger_phone}`} className="w-6 h-6 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center hover:bg-emerald-600 hover:text-white transition-all border border-emerald-100 shrink-0" title="Gọi điện">
+                                <Phone size={10} />
+                            </a>
+                        )}
+                        <CopyableCode code={order.passenger_phone || ''} className="text-[10px] font-bold text-indigo-600 truncate" label={displayPhone} />
+                    </div>
                 </div>
 
                 <div className="flex justify-end items-center gap-1 text-[9px] font-bold text-slate-400">
@@ -607,6 +608,7 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ profile, trips, onRef
                   const { pickup, dropoff } = extractLocations(order.note);
                   const displayPickup = pickup || trip?.origin_name;
                   const displayDropoff = dropoff || trip?.dest_name;
+                  const displayPhone = order.passenger_phone ? order.passenger_phone.replace(/^\+?84/, '0') : 'N/A';
 
                   return (
                     <tr 
@@ -645,7 +647,7 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ profile, trips, onRef
                                  <Phone size={8} />
                                </a>
                              )}
-                             <CopyableCode code={order.passenger_phone || ''} className="text-[9px] font-bold text-indigo-600 truncate" label={order.passenger_phone || '---'} />
+                             <CopyableCode code={order.passenger_phone || ''} className="text-[9px] font-bold text-indigo-600 truncate" label={displayPhone} />
                           </div>
                         </div>
                       </td>

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Layout from './components/Layout.tsx';
 import Dashboard from './components/Dashboard.tsx';
@@ -184,15 +185,31 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      const session = data?.session;
-      if (session?.user) {
-        setUser(session.user);
-        fetchProfile(session.user.id);
+    const initAuth = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data?.session?.user) {
+        setUser(data.session.user);
+        fetchProfile(data.session.user.id);
       } else {
-        setProfileLoading(false);
+        // TEMP: Auto login for testing
+        console.log("Auto-logging in for test...");
+        try {
+          const { error } = await supabase.auth.signInWithPassword({
+            phone: '+84825846888',
+            password: '123123'
+          });
+          if (error) {
+            console.error("Auto login error:", error);
+            setProfileLoading(false);
+          }
+        } catch (e) {
+          console.error(e);
+          setProfileLoading(false);
+        }
       }
-    });
+    };
+    
+    initAuth();
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       const currentUser = session?.user ?? null;

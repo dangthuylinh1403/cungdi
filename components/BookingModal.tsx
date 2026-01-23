@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Phone, User, MapPin, Users, CreditCard, AlertCircle, CheckCircle2, Sparkles, Info, Navigation, Calendar, Clock, ArrowRight, Car, Map, ShieldCheck, Wifi, Snowflake, Droplets, Star, Award, Copy, GripVertical, Crown, Check, Search, Ticket, Wallet, MessageSquare, ChevronDown, Play, Timer, Zap } from 'lucide-react';
-import { Trip, Profile, TripStatus } from '../types';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { X, Phone, User, MapPin, Users, CreditCard, AlertCircle, CheckCircle2, Sparkles, Info, Navigation, Calendar, Clock, ArrowRight, Car, Map, ShieldCheck, Wifi, Snowflake, Droplets, Star, Award, Copy, GripVertical, Crown, Check, Search, Ticket, Wallet, MessageSquare, ChevronDown, Play, Timer, Zap, Gem, Trophy, Heart, Medal } from 'lucide-react';
+import { Trip, Profile, TripStatus, MembershipTier } from '../types';
 import CopyableCode from './CopyableCode';
 import { getVehicleConfig, getTripStatusDisplay } from './SearchTrips';
 import { LOCAL_LOCATIONS } from '../services/locationData';
@@ -25,6 +25,17 @@ const searchLocalPlaces = (query: string) => {
   return matches.slice(0, 5).map(item => item.name);
 };
 
+// Helper for Tier Config with Hardcoded Values
+const getTierConfig = (tier: MembershipTier = 'standard') => {
+    switch (tier) {
+        case 'silver': return { label: 'Bạc', icon: Medal, color: 'text-slate-500', bg: 'bg-slate-100', border: 'border-slate-200', discountVal: 0.1, discountLabel: '10%' };
+        case 'gold': return { label: 'Vàng', icon: Trophy, color: 'text-amber-500', bg: 'bg-amber-50', border: 'border-amber-100', discountVal: 0.2, discountLabel: '20%' };
+        case 'diamond': return { label: 'Kim Cương', icon: Gem, color: 'text-cyan-500', bg: 'bg-cyan-50', border: 'border-cyan-100', discountVal: 0.3, discountLabel: '30%' };
+        case 'family': return { label: 'Gia Đình', icon: Heart, color: 'text-rose-500', bg: 'bg-rose-50', border: 'border-rose-100', discountVal: 1.0, discountLabel: '100%' };
+        default: return { label: 'Thường', icon: User, color: 'text-slate-400', bg: 'bg-white', border: 'border-slate-100', discountVal: 0, discountLabel: '0%' };
+    }
+};
+
 const BookingModal: React.FC<BookingModalProps> = ({ trip, profile, isOpen, onClose, onConfirm }) => {
   const [phone, setPhone] = useState('');
   const [seats, setSeats] = useState(1);
@@ -42,6 +53,7 @@ const BookingModal: React.FC<BookingModalProps> = ({ trip, profile, isOpen, onCl
   const [showSeatPicker, setShowSeatPicker] = useState(false);
   
   const [vehicleImage, setVehicleImage] = useState<string | null>(null);
+  const [driverIsProvider, setDriverIsProvider] = useState(false); // Check if driver offers discounts
 
   const isRequest = trip.is_request;
 
@@ -62,12 +74,24 @@ const BookingModal: React.FC<BookingModalProps> = ({ trip, profile, isOpen, onCl
       setSeats(isRequest ? trip.seats : 1);
       document.body.style.overflow = 'hidden';
       
-      // Fetch Vehicle Image logic
-      if (!trip.is_request && trip.vehicle_info) {
-        const parts = trip.vehicle_info.split(' (');
-        if (parts.length > 1) {
-            const plate = parts[1].replace(')', '').trim();
-            const fetchImage = async () => {
+      // Fetch Driver Info (Vehicle Image + Discount Status)
+      const fetchDriverDetails = async () => {
+        if (!trip.driver_id) return;
+        
+        // Fetch Discount Status
+        const { data: driverProfile } = await supabase
+            .from('profiles')
+            .select('is_discount_provider')
+            .eq('id', trip.driver_id)
+            .single();
+        
+        if (driverProfile) setDriverIsProvider(driverProfile.is_discount_provider || false);
+
+        // Fetch Vehicle Image
+        if (!trip.is_request && trip.vehicle_info) {
+            const parts = trip.vehicle_info.split(' (');
+            if (parts.length > 1) {
+                const plate = parts[1].replace(')', '').trim();
                 const { data } = await supabase
                     .from('vehicles')
                     .select('image_url')
@@ -78,15 +102,20 @@ const BookingModal: React.FC<BookingModalProps> = ({ trip, profile, isOpen, onCl
                 } else {
                     setVehicleImage(null);
                 }
-            };
-            fetchImage();
+            } else {
+                setVehicleImage(null);
+            }
         } else {
             setVehicleImage(null);
         }
-      } else {
-        setVehicleImage(null);
-      }
+      };
+      
+      fetchDriverDetails();
 
+    } else {
+        // Reset state on close
+        setDriverIsProvider(false);
+        setVehicleImage(null);
     }
     return () => {
       document.body.style.overflow = 'unset';
@@ -116,6 +145,31 @@ const BookingModal: React.FC<BookingModalProps> = ({ trip, profile, isOpen, onCl
   useEffect(() => {
     setDropoffSuggestions(searchLocalPlaces(dropoffLocation));
   }, [dropoffLocation]);
+
+  // --- PRICE CALCULATION LOGIC ---
+  const { originalPrice, discountAmount, finalPrice, discountLabel, tierConfig } = useMemo(() => {
+      const baseTotal = trip.price * seats;
+      let discount = 0;
+      const tier = profile?.membership_tier || 'standard';
+      const config = getTierConfig(tier);
+
+      // Discount logic:
+      // 1. Not a request (Booking available trip)
+      // 2. Driver is a discount provider
+      // 3. User has a tier > standard
+      if (!isRequest && driverIsProvider && tier !== 'standard') {
+          discount = baseTotal * config.discountVal;
+      }
+
+      return {
+          originalPrice: baseTotal,
+          discountAmount: discount,
+          finalPrice: baseTotal - discount,
+          discountLabel: `Giảm giá thành viên ${config.label}`,
+          tierConfig: config
+      };
+  }, [trip.price, seats, profile, driverIsProvider, isRequest, isOpen]);
+
 
   if (!isOpen) return null;
 
@@ -193,14 +247,10 @@ const BookingModal: React.FC<BookingModalProps> = ({ trip, profile, isOpen, onCl
     else fillBarColor = 'bg-rose-500';
   }
 
-  const formattedPrice = new Intl.NumberFormat('vi-VN').format(trip.price * seats);
-
   const createdAtDate = trip.created_at ? new Date(trip.created_at) : null;
   const createdAtTime = createdAtDate ? createdAtDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--:--';
-  // Use dd/mm format explicitly
   const createdAtDay = createdAtDate ? `${String(createdAtDate.getDate()).padStart(2, '0')}/${String(createdAtDate.getMonth() + 1).padStart(2, '0')}` : '--/--';
 
-  // Status checks for border coloring
   const isOngoing = trip.status === TripStatus.ON_TRIP;
   const isUrgent = trip.status === TripStatus.URGENT;
   const isPreparing = trip.status === TripStatus.PREPARING;
@@ -235,7 +285,6 @@ const BookingModal: React.FC<BookingModalProps> = ({ trip, profile, isOpen, onCl
         dot: 'bg-indigo-500'
       };
 
-  // 100% Clone of TripCard from SearchTrips.tsx (Removed Phone)
   const TripMainInfoCard = ({ className = "" }) => (
     <div 
       className={`bg-white p-4 rounded-[24px] border shadow-sm flex flex-col justify-between group overflow-hidden relative ${isOngoing ? 'border-blue-200 bg-blue-50/20' : isUrgent ? 'border-rose-400 bg-rose-50/20' : isPreparing ? 'border-amber-300 bg-amber-50/10' : 'border-slate-100'} ${isCompleted || isCancelled ? 'opacity-80' : ''} ${className}`}
@@ -336,9 +385,17 @@ const BookingModal: React.FC<BookingModalProps> = ({ trip, profile, isOpen, onCl
   const TripDriverInfoCard = ({ className = "" }) => (
     !isRequest ? (
          <div className={`bg-white rounded-[24px] border border-emerald-100 p-5 shadow-sm space-y-3 flex flex-col justify-center ${className}`}>
-            <div className="flex items-center gap-2">
-               <ShieldCheck size={16} className="text-emerald-500" />
-               <h4 className="text-xs font-bold text-slate-800">Thông tin xe & tài xế</h4>
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <ShieldCheck size={16} className="text-emerald-500" />
+                    <h4 className="text-xs font-bold text-slate-800">Thông tin xe & tài xế</h4>
+                </div>
+                {/* Discount Badge */}
+                {driverIsProvider && (
+                    <div className="px-2 py-0.5 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black border border-rose-100 flex items-center gap-1">
+                        <Gem size={9} /> Đối tác giảm giá
+                    </div>
+                )}
             </div>
             <div className="flex items-center gap-4">
                <div className="relative">
@@ -391,7 +448,7 @@ const BookingModal: React.FC<BookingModalProps> = ({ trip, profile, isOpen, onCl
 
         <div className="flex flex-1 overflow-hidden flex-col md:flex-row">
             
-            {/* --- LEFT COLUMN: TRIP INFO (Desktop Only) --- */}
+            {/* --- LEFT COLUMN: TRIP INFO --- */}
             <div className="hidden md:flex w-1/2 h-full flex-col bg-emerald-50/40 border-r border-slate-200 p-6 pt-8">
                 <div className="flex items-center gap-3 mb-5 shrink-0 h-[32px]">
                     <div className="p-2 bg-emerald-100/50 rounded-xl text-emerald-600 border border-emerald-100">
@@ -410,7 +467,7 @@ const BookingModal: React.FC<BookingModalProps> = ({ trip, profile, isOpen, onCl
                 
                 <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-4">
                     
-                    {/* Mobile Trip Info Injection (Visible only on Mobile) */}
+                    {/* Mobile Trip Info Injection */}
                     <div className="md:hidden space-y-4">
                         <div className="flex items-center gap-3 mb-5 shrink-0 h-[32px]">
                             <div className="p-2 bg-emerald-100/50 rounded-xl text-emerald-600 border border-emerald-100">
@@ -439,6 +496,7 @@ const BookingModal: React.FC<BookingModalProps> = ({ trip, profile, isOpen, onCl
                         
                         {/* Route Inputs (Top Card) */}
                         <div className={`p-5 rounded-[24px] bg-white border border-slate-100 shadow-sm relative flex flex-col md:flex-1`}>
+                            {/* ... Route Inputs Content from previous implementation ... */}
                             <h4 className={`text-xs font-bold mb-3 flex items-center gap-2 ${rightTheme.textMain} shrink-0`}>
                                 <Navigation size={14} /> {isRequest ? 'Lộ trình của khách' : 'Chi tiết điểm đón & trả'}
                             </h4>
@@ -535,7 +593,7 @@ const BookingModal: React.FC<BookingModalProps> = ({ trip, profile, isOpen, onCl
                         </div>
 
                         {/* Booking Inputs (Bottom Card) */}
-                        <div className="bg-white p-5 rounded-[24px] border border-slate-100 shadow-sm space-y-4 md:h-[210px] shrink-0 flex flex-col justify-center">
+                        <div className="bg-white p-5 rounded-[24px] border border-slate-100 shadow-sm space-y-4 md:h-[230px] shrink-0 flex flex-col justify-center">
                             <div className="flex gap-3 h-[60px]">
                                 <div className="flex-1 min-w-0">
                                     <label className={`text-xs font-bold text-slate-800 mb-1.5 ml-1 flex items-center gap-1.5`}>
@@ -587,18 +645,31 @@ const BookingModal: React.FC<BookingModalProps> = ({ trip, profile, isOpen, onCl
                                 </div>
 
                                 {!isRequest && (
-                                    <div className="w-[95px] shrink-0">
+                                    <div className="w-[105px] shrink-0">
                                         <label className={`text-xs font-bold text-slate-800 mb-1.5 ml-1 flex items-center gap-1.5`}>
                                             <Wallet size={10} className={rightTheme.textMain} /> Thành tiền
                                         </label>
-                                        <div className={`w-full h-[38px] px-2 rounded-xl border flex items-center justify-center ${rightTheme.bgBadge} ${rightTheme.borderBadge}`}>
-                                            <span className={`text-xs font-black ${rightTheme.textBadge} truncate`}>
-                                            {formattedPrice}đ
-                                            </span>
+                                        <div className={`w-full h-[38px] px-2 rounded-xl border flex flex-col items-center justify-center ${rightTheme.bgBadge} ${rightTheme.borderBadge}`}>
+                                            <div className="flex items-center gap-1">
+                                                {discountAmount > 0 && <span className="text-[9px] text-slate-400 line-through decoration-slate-400">{new Intl.NumberFormat('vi-VN').format(originalPrice)}</span>}
+                                                <span className={`text-xs font-black ${rightTheme.textBadge} truncate`}>
+                                                {new Intl.NumberFormat('vi-VN').format(finalPrice)}đ
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
                             </div>
+                            
+                            {/* Membership Discount Badge */}
+                            {!isRequest && discountAmount > 0 && (
+                                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-100">
+                                    <tierConfig.icon size={12} className={tierConfig.color} />
+                                    <span className="text-[10px] font-bold text-slate-700">
+                                        {discountLabel}: <span className="text-emerald-600">-{new Intl.NumberFormat('vi-VN').format(discountAmount)}đ</span>
+                                    </span>
+                                </div>
+                            )}
 
                             <div>
                                 <label className={`text-xs font-bold text-slate-800 mb-1.5 ml-1 flex items-center gap-1.5`}>

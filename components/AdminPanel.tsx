@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Shield, Search, Phone, Loader2, ArrowUpDown, Trash2, ChevronDown, Check, Car, Ticket, 
-  Trophy, Star, Medal, Zap, CalendarDays, User, Settings, ShieldAlert, Edit3, X, Save, Clock, Crown, LayoutList, LayoutGrid, Key, Mail
+  Trophy, Star, Medal, Zap, CalendarDays, User, Settings, ShieldAlert, Edit3, X, Save, Clock, Crown, LayoutList, LayoutGrid, Key, Mail, CheckSquare, Square, Gem, Heart, Award, ToggleLeft, ToggleRight, Sliders, Layers
 } from 'lucide-react';
-import { Profile, UserRole } from '../types.ts';
+import { Profile, UserRole, MembershipTier } from '../types.ts';
 import { supabase } from '../lib/supabase.ts';
 import CopyableCode from './CopyableCode.tsx';
 import { UnifiedDropdown } from './SearchTrips.tsx';
@@ -23,18 +22,29 @@ interface UserWithStats extends Profile {
   email?: string;
 }
 
-// 1. Hàm lấy Style cho Avatar dựa trên Quyền hạn
-const getRoleAvatarStyle = (role: UserRole) => {
+// 1. Hàm lấy Style cho Avatar & Nhãn dựa trên Quyền hạn (Thêm mô tả chi tiết cho Tooltip)
+const getRoleStyle = (role: UserRole) => {
   switch (role) {
     case 'admin': 
-      return { style: 'bg-rose-50 text-rose-600 border-rose-100', icon: Shield };
+      return { label: 'Quản trị', style: 'bg-rose-50 text-rose-600 border-rose-100', icon: Shield, desc: 'Quản trị viên: Có toàn quyền kiểm soát hệ thống, cấu hình người dùng và quản lý dữ liệu.' };
     case 'manager': 
-      return { style: 'bg-indigo-50 text-indigo-600 border-indigo-100', icon: Settings };
+      return { label: 'Điều phối', style: 'bg-indigo-50 text-indigo-600 border-indigo-100', icon: Settings, desc: 'Điều phối viên: Chịu trách nhiệm giám sát các chuyến xe, đơn hàng và hỗ trợ tài xế/khách hàng.' };
     case 'driver': 
-      return { style: 'bg-emerald-50 text-emerald-600 border-emerald-100', icon: Car };
+      return { label: 'Tài xế', style: 'bg-emerald-50 text-emerald-600 border-emerald-100', icon: Car, desc: 'Đối tác lái xe: Có quyền đăng chuyến, quản lý phương tiện và nhận yêu cầu từ hành khách.' };
     default: 
-      return { style: 'bg-sky-50 text-sky-600 border-sky-100', icon: User };
+      return { label: 'Thành viên', style: 'bg-sky-50 text-sky-600 border-sky-100', icon: User, desc: 'Thành viên phổ thông: Có thể tìm kiếm chuyến xe, đăng yêu cầu tìm xe và theo dõi lịch trình.' };
   }
+};
+
+// Hàm lấy config cho Membership Tier (Hardcoded Discounts)
+const getTierConfig = (tier: MembershipTier = 'standard') => {
+    switch (tier) {
+        case 'silver': return { label: 'Bạc', icon: Award, color: 'text-slate-500', bg: 'bg-slate-100', border: 'border-slate-200', discountVal: 10, discountLabel: '10%', desc: 'Ưu đãi cấp độ Bạc: Giảm giá 10% trên tổng hóa đơn (áp dụng tại các đối tác hỗ trợ).' };
+        case 'gold': return { label: 'Vàng', icon: Trophy, color: 'text-amber-500', bg: 'bg-amber-50', border: 'border-amber-100', discountVal: 20, discountLabel: '20%', desc: 'Ưu đãi cấp độ Vàng: Giảm giá 20% trên tổng hóa đơn, ưu tiên xử lý yêu cầu khẩn cấp.' };
+        case 'diamond': return { label: 'Kim Cương', icon: Gem, color: 'text-cyan-500', bg: 'bg-cyan-50', border: 'border-cyan-100', discountVal: 30, discountLabel: '30%', desc: 'Ưu đãi Kim Cương: Giảm giá 30%, hỗ trợ chăm sóc khách hàng đặc biệt 24/7.' };
+        case 'family': return { label: 'Gia Đình', icon: Heart, color: 'text-rose-500', bg: 'bg-rose-50', border: 'border-rose-100', discountVal: 100, discountLabel: '100%', desc: 'Cấp độ Gia Đình: Ưu đãi đặc biệt giảm 100% chi phí cho các thành viên trong nhóm liên kết.' };
+        default: return { label: 'Thường', icon: User, color: 'text-slate-400', bg: 'bg-white', border: 'border-slate-100', discountVal: 0, discountLabel: '0%', desc: 'Thành viên mới/Tiêu chuẩn: Tận hưởng dịch vụ kết nối xe tiện chuyến nhanh chóng.' };
+    }
 };
 
 // 2. Hàm phân cấp màu sắc cho số lượng (Heatmap levels)
@@ -47,18 +57,23 @@ const getCountLevelStyle = (count: number) => {
   return 'bg-purple-50 text-purple-600 border-purple-100'; // Elite (50+)
 };
 
-// Style cho badge trên Avatar
-const getBookingBadgeStyle = (count: number) => {
-  if (count >= 20) return 'bg-rose-500 text-white ring-rose-200 shadow-rose-200';
-  if (count >= 10) return 'bg-amber-500 text-white ring-amber-200 shadow-amber-200';
-  if (count >= 5) return 'bg-emerald-500 text-white ring-emerald-200 shadow-emerald-200';
-  if (count >= 1) return 'bg-sky-500 text-white ring-sky-200 shadow-sky-200';
-  return 'bg-slate-300 text-white ring-slate-100 shadow-slate-200';
-};
+const CircleCheckbox = ({ checked, onChange }: { checked: boolean, onChange: () => void }) => (
+  <button
+    type="button"
+    onClick={(e) => { e.stopPropagation(); onChange(); }}
+    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+      checked 
+        ? 'bg-indigo-600 border-indigo-600 shadow-md shadow-indigo-200 scale-105' 
+        : 'bg-white border-slate-300 hover:border-indigo-400'
+    }`}
+  >
+    {checked && <Check size={12} className="text-white" strokeWidth={3} />}
+  </button>
+);
 
-const RoleSelector = ({ value, onChange, disabled }: { value: UserRole, onChange: (role: UserRole) => void, disabled?: boolean }) => {
+const RoleSelector = ({ value, onChange, disabled, compact = false, direction = 'down' }: { value: UserRole, onChange: (role: UserRole) => void, disabled?: boolean, compact?: boolean, direction?: 'up' | 'down' }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [roleSearch, setRoleSearch] = useState('');
+  const [search, setSearch] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
   
   const roles: { label: string, value: UserRole, icon: any, color: string, style: string }[] = [
@@ -68,14 +83,14 @@ const RoleSelector = ({ value, onChange, disabled }: { value: UserRole, onChange
     { label: 'Thành viên', value: 'user', icon: User, color: 'text-sky-600', style: 'bg-sky-50 text-sky-600 border-sky-100' },
   ];
   
+  const filteredRoles = roles.filter(r => removeAccents(r.label).includes(removeAccents(search)));
   const currentRole = roles.find(r => r.value === value) || roles[3];
-  const filteredRoles = roles.filter(r => removeAccents(r.label).includes(removeAccents(roleSearch)));
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
-        setRoleSearch('');
+        setSearch('');
       }
     };
     if (isOpen) document.addEventListener('mousedown', handleClickOutside);
@@ -83,49 +98,180 @@ const RoleSelector = ({ value, onChange, disabled }: { value: UserRole, onChange
   }, [isOpen]);
 
   return (
-    <div className="relative w-full" ref={dropdownRef}>
+    <div className="relative w-full h-full" ref={dropdownRef}>
       <button 
         type="button" 
         disabled={disabled} 
-        onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
-        className={`w-full flex items-center justify-between px-3 py-1.5 border rounded-xl transition-all duration-300 relative z-10 ${currentRole.style} ${isOpen ? 'ring-2 ring-indigo-100 border-indigo-400 shadow-sm' : 'hover:brightness-95'} ${disabled ? 'opacity-80 cursor-not-allowed' : ''}`}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(!isOpen); }}
+        className={`w-full h-full flex items-center rounded-xl transition-all duration-300 relative z-10 ${disabled ? 'opacity-80 cursor-not-allowed' : ''} ${ compact ? 'p-2.5 justify-center md:px-3 md:py-2 md:justify-between bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100' : 'px-3 py-1.5 justify-between border hover:brightness-95 ' + currentRole.style } ${isOpen && !compact ? 'ring-2 ring-indigo-100 border-indigo-400 shadow-sm' : ''}`}
       >
         <div className="flex items-center gap-2 overflow-hidden">
-          <currentRole.icon size={12} className={currentRole.color.split(' ')[0]} />
-          <span className="text-[10px] font-bold truncate">{currentRole.label}</span>
+          <currentRole.icon size={14} className={currentRole.color.split(' ')[0]} />
+          <span className={`text-[10px] font-bold truncate ${compact ? 'hidden md:inline' : ''}`}>{compact ? 'Chọn: ' + currentRole.label : currentRole.label}</span>
         </div>
-        <ChevronDown size={12} className={`opacity-50 transition-transform duration-300 shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown size={12} className={`transition-transform duration-300 shrink-0 ${isOpen ? 'rotate-180' : ''} ${compact ? 'text-slate-400 hidden md:inline-block' : 'opacity-50'}`} />
       </button>
       
       {isOpen && (
-        <div className="absolute top-full mt-1 right-0 w-48 bg-white rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.2)] border border-slate-100 z-[999] p-1.5 animate-in fade-in zoom-in-95 duration-150">
-          <div className="relative mb-2 px-1 pt-1">
+        <div 
+          className={`absolute ${direction === 'up' ? 'bottom-full mb-3' : 'top-full mt-1'} right-0 w-52 bg-white rounded-2xl shadow-[0_20px_70px_rgba(0,0,0,0.3)] border border-slate-100 z-[1000] p-1.5 animate-in fade-in zoom-in-95 ${direction === 'up' ? 'slide-in-from-bottom-2' : 'slide-in-from-top-2'} duration-200`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-1 mb-1 relative">
             <Search size={12} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input 
-              type="text" autoFocus placeholder="Tìm quyền..." value={roleSearch}
-              onChange={(e) => setRoleSearch(e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full pl-8 pr-2 py-2 bg-slate-50 border-none rounded-lg text-[10px] font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100 placeholder:text-slate-400"
+              type="text" 
+              autoFocus 
+              placeholder="Tìm quyền..." 
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-2 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
             />
           </div>
-          <div className="space-y-0.5 p-0.5 max-h-48 overflow-y-auto custom-scrollbar">
-            {filteredRoles.map((role) => (
+          <div className="space-y-0.5 p-0.5 max-h-56 overflow-y-auto custom-scrollbar">
+            {filteredRoles.length > 0 ? filteredRoles.map((role) => (
               <button key={role.value} type="button" 
-                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onChange(role.value); setIsOpen(false); setRoleSearch(''); }}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all ${value === role.value ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-slate-50 text-slate-600'}`}>
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChange(role.value); setIsOpen(false); setSearch(''); }}
+                className={`w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all ${value === role.value ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-slate-50 text-slate-600'}`}>
                 <div className="flex items-center gap-3">
-                  <role.icon size={12} className={value === role.value ? 'text-white' : role.color.split(' ')[0]} />
+                  <role.icon size={14} className={value === role.value ? 'text-white' : role.color.split(' ')[0]} />
                   <span className="text-[11px] font-bold">{role.label}</span>
                 </div>
-                {value === role.value && <Check size={12} className="text-white" />}
+                {value === role.value && <Check size={14} className="text-white" strokeWidth={3} />}
               </button>
-            ))}
+            )) : (
+              <div className="p-4 text-center text-[10px] text-slate-400 italic font-medium">Không tìm thấy kết quả</div>
+            )}
           </div>
         </div>
       )}
     </div>
   );
 };
+
+// Updated TierSelector with Search, consistent direction logic and style
+const TierSelector = ({ value, onChange, disabled, compact = false, direction = 'down' }: { value: MembershipTier, onChange: (tier: MembershipTier) => void, disabled?: boolean, compact?: boolean, direction?: 'up' | 'down' }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    const tiers: MembershipTier[] = ['standard', 'silver', 'gold', 'diamond', 'family'];
+
+    const filteredTiers = tiers.filter(t => {
+        const config = getTierConfig(t);
+        return removeAccents(config.label).includes(removeAccents(search));
+    });
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+                setSearch('');
+            }
+        };
+        if (isOpen) document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isOpen]);
+
+    const currentConfig = getTierConfig(value || 'standard');
+
+    return (
+        <div className="relative w-full h-full" ref={dropdownRef}>
+            <button
+                type="button"
+                disabled={disabled}
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(!isOpen); }}
+                className={`w-full h-full flex items-center rounded-xl transition-all duration-300 relative z-10 ${disabled ? 'opacity-80 cursor-not-allowed' : ''} ${ compact ? 'p-2.5 justify-center md:px-3 md:py-2 md:justify-between bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100' : 'px-3 py-1.5 justify-between border hover:brightness-95 ' + currentConfig.bg + ' ' + currentConfig.border } ${isOpen && !compact ? 'ring-2 ring-indigo-100 border-indigo-400 shadow-sm' : ''}`}
+            >
+                <div className="flex items-center gap-2 min-w-0">
+                    <currentConfig.icon size={14} className={currentConfig.color} />
+                    <span className={`text-[10px] font-bold truncate ${compact ? 'hidden md:inline text-slate-700' : currentConfig.color.replace('text-','text-slate-800 ')}`}>{compact ? 'Chọn: ' + currentConfig.label : currentConfig.label}</span>
+                </div>
+                <ChevronDown size={12} className={`transition-transform duration-300 shrink-0 ${isOpen ? 'rotate-180' : ''} ${compact ? 'text-slate-400 hidden md:inline-block' : 'opacity-50'}`} />
+            </button>
+
+            {isOpen && !disabled && (
+                <div 
+                    className={`absolute ${direction === 'up' ? 'bottom-full mb-3' : 'top-full mt-1'} right-0 w-52 bg-white rounded-2xl shadow-[0_20px_70px_rgba(0,0,0,0.3)] border border-slate-100 z-[1000] p-1.5 animate-in fade-in zoom-in-95 ${direction === 'up' ? 'slide-in-from-bottom-2' : 'slide-in-from-top-2'} duration-200`}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="p-1 mb-1 relative">
+                        <Search size={12} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input 
+                        type="text" 
+                        autoFocus 
+                        placeholder="Tìm cấp độ..." 
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="w-full pl-9 pr-2 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
+                        />
+                    </div>
+                    <div className="space-y-0.5 p-0.5 max-h-56 overflow-y-auto custom-scrollbar">
+                    {filteredTiers.length > 0 ? filteredTiers.map(tier => {
+                        const config = getTierConfig(tier);
+                        return (
+                            <button
+                                key={tier}
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChange(tier); setIsOpen(false); setSearch(''); }}
+                                className={`w-full flex items-center justify-between px-3 py-3 rounded-xl text-left transition-all ${value === tier ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-slate-50 text-slate-600'}`}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <config.icon size={12} className={value === tier ? 'text-white' : config.color} />
+                                    <span className="text-[11px] font-bold">{config.label}</span>
+                                </div>
+                                {value === tier && <Check size={12} className="text-white" />}
+                            </button>
+                        )
+                    }) : (
+                        <div className="p-4 text-center text-[10px] text-slate-400 italic font-medium">Không tìm thấy kết quả</div>
+                    )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const ToggleSelector = ({ value, onChange, label, direction = 'down' }: { value: boolean, onChange: (val: boolean) => void, label: string, direction?: 'up' | 'down' }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) setIsOpen(false);
+        };
+        if (isOpen) document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isOpen]);
+
+    return (
+        <div className="relative w-full h-full" ref={dropdownRef}>
+            <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(!isOpen); }}
+                className="w-full h-full flex items-center justify-center md:justify-between p-2.5 md:px-3 md:py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 hover:bg-slate-100 transition-all"
+            >
+                <div className="flex items-center gap-2">
+                    {value ? <ToggleRight size={14} className="text-emerald-500" /> : <ToggleLeft size={14} className="text-slate-400" />}
+                    <span className="text-[10px] font-bold hidden md:inline">{value ? 'Đang Bật' : 'Đang Tắt'}</span>
+                </div>
+                <ChevronDown size={12} className={`text-slate-400 transition-transform hidden md:inline-block ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isOpen && (
+                <div className={`absolute ${direction === 'up' ? 'bottom-full mb-3' : 'top-full mt-1'} right-0 w-36 bg-white rounded-2xl shadow-xl border border-slate-100 z-[1000] p-1 animate-in fade-in zoom-in-95`}>
+                    <button onClick={() => { onChange(true); setIsOpen(false); }} className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-[10px] font-bold ${value ? 'bg-emerald-50 text-emerald-600' : 'hover:bg-slate-50 text-slate-600'}`}>
+                        <span className="flex items-center gap-2"><ToggleRight size={14}/> Bật {label}</span>
+                        {value && <Check size={12}/>}
+                    </button>
+                    <button onClick={() => { onChange(false); setIsOpen(false); }} className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-[10px] font-bold ${!value ? 'bg-rose-50 text-rose-600' : 'hover:bg-slate-50 text-slate-600'}`}>
+                        <span className="flex items-center gap-2"><ToggleLeft size={14}/> Tắt {label}</span>
+                        {!value && <Check size={12}/>}
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
 
 interface AdminPanelProps {
     showAlert: (config: any) => void;
@@ -140,10 +286,24 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ showAlert }) => {
   const [editData, setEditData] = useState({ full_name: '', phone: '' });
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  
+  // Filters
   const [roleFilter, setRoleFilter] = useState<string[]>(['ALL']);
+  const [tierFilter, setTierFilter] = useState<string[]>(['ALL']); 
   const [activityTimeFilter, setActivityTimeFilter] = useState<string[]>(['ALL']); 
+  
   const [sortOrder, setSortOrder] = useState('NAME_ASC');
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'full_name', direction: 'asc' });
+
+  // Bulk Actions State
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+  
+  // Bulk Action Mode
+  const [bulkActionType, setBulkActionType] = useState<'ROLE' | 'TIER' | 'DISCOUNT'>('ROLE');
+  const [pendingBulkRole, setPendingBulkRole] = useState<UserRole>('user');
+  const [pendingBulkTier, setPendingBulkTier] = useState<MembershipTier>('standard');
+  const [pendingBulkDiscount, setPendingBulkDiscount] = useState<boolean>(false);
 
   // Password Reset UI State
   const [passwordResetUser, setPasswordResetUser] = useState<UserWithStats | null>(null);
@@ -178,7 +338,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ showAlert }) => {
           trips_count: userTrips.length,
           bookings_count: userBookings.length,
           last_activity_at: lastActivity,
-          created_at: p.created_at 
+          created_at: p.created_at,
+          membership_tier: p.membership_tier || 'standard',
+          is_discount_provider: p.is_discount_provider || false
         };
       });
       setUsers(userStats);
@@ -208,6 +370,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ showAlert }) => {
       const matchesSearch = nameMatch || phoneMatch || emailMatch;
       
       const matchesRole = roleFilter.includes('ALL') || roleFilter.includes(u.role);
+      const matchesTier = tierFilter.includes('ALL') || tierFilter.includes(u.membership_tier || 'standard');
 
       let matchesActivityTime = activityTimeFilter.includes('ALL');
       if (!matchesActivityTime && u.last_activity_at) {
@@ -219,7 +382,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ showAlert }) => {
           matchesActivityTime = false;
       }
       
-      return matchesSearch && matchesRole && matchesActivityTime;
+      return matchesSearch && matchesRole && matchesTier && matchesActivityTime;
     });
 
     filtered.sort((a: any, b: any) => {
@@ -263,15 +426,85 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ showAlert }) => {
       });
     }
     return filtered;
-  }, [users, searchTerm, roleFilter, activityTimeFilter, sortOrder, sortConfig]);
+  }, [users, searchTerm, roleFilter, tierFilter, activityTimeFilter, sortOrder, sortConfig]);
 
-  const handleUpdateRole = async (userId: string, newRole: UserRole) => {
-    setUpdatingId(userId);
+  // --- SELECTION LOGIC ---
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filteredUsers.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredUsers.map(u => u.id));
+    }
+  };
+
+  const toggleSelectUser = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(pId => pId !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkExecute = async () => {
+    setIsBulkProcessing(true);
     try {
-      const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
-      if (error) throw error;
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
-    } catch (err: any) { alert(err.message); } finally { setUpdatingId(null); }
+        let updateData = {};
+        let successMessage = "";
+
+        if (bulkActionType === 'ROLE') {
+            updateData = { role: pendingBulkRole };
+            successMessage = `Đã cập nhật quyền cho ${selectedIds.length} người dùng.`;
+        } else if (bulkActionType === 'TIER') {
+            updateData = { membership_tier: pendingBulkTier };
+            successMessage = `Đã cập nhật cấp độ cho ${selectedIds.length} người dùng.`;
+        } else if (bulkActionType === 'DISCOUNT') {
+            updateData = { is_discount_provider: pendingBulkDiscount };
+            successMessage = `Đã ${pendingBulkDiscount ? 'bật' : 'tắt'} giảm giá cho ${selectedIds.length} người dùng.`;
+        }
+
+        const { error } = await supabase.from('profiles').update(updateData).in('id', selectedIds);
+        if (error) throw error;
+        
+        // Update local state
+        setUsers(prev => prev.map(u => selectedIds.includes(u.id) ? { ...u, ...updateData } : u));
+        setSelectedIds([]);
+        showAlert({ title: 'Thành công', message: successMessage, variant: 'success' });
+    } catch (err: any) {
+        showAlert({ title: 'Lỗi', message: err.message, variant: 'danger' });
+    } finally {
+        setIsBulkProcessing(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    showAlert({
+        title: 'Xoá hàng loạt?',
+        message: `Bạn có chắc muốn xoá ${selectedIds.length} người dùng đang chọn? Hành động này không thể hoàn tác.`,
+        variant: 'danger',
+        confirmText: 'Xoá ngay',
+        cancelText: 'Hủy',
+        onConfirm: async () => {
+            setIsBulkProcessing(true);
+            try {
+                const { error } = await supabase.from('profiles').delete().in('id', selectedIds);
+                if (error) throw error;
+                setUsers(prev => prev.filter(u => !selectedIds.includes(u.id)));
+                setSelectedIds([]);
+                showAlert({ title: 'Thành công', message: 'Đã xoá người dùng thành công.', variant: 'success' });
+            } catch (err: any) {
+                showAlert({ title: 'Lỗi', message: 'Không thể xoá người dùng (có thể do ràng buộc dữ liệu).', variant: 'danger' });
+            } finally {
+                setIsBulkProcessing(false);
+            }
+        }
+    });
+  };
+
+  const handleEditSelected = () => {
+    if (selectedIds.length !== 1) return;
+    const userToEdit = users.find(u => u.id === selectedIds[0]);
+    if (userToEdit) {
+      handleStartEdit(userToEdit);
+      setSelectedIds([]); // Clear selection after entering edit mode
+    }
   };
 
   const handleStartEdit = (user: UserWithStats) => {
@@ -292,29 +525,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ showAlert }) => {
     } catch (err: any) { alert(err.message); } finally { setUpdatingId(null); }
   };
 
-  const handleDeleteUser = async (userId: string, userName: string) => {
-    showAlert({
-        title: 'Xoá người dùng?',
-        message: `Bạn có chắc muốn xoá người dùng "${userName}"? Hành động này sẽ xoá toàn bộ dữ liệu liên quan.`,
-        variant: 'danger',
-        confirmText: 'Xoá ngay',
-        cancelText: 'Hủy',
-        onConfirm: async () => {
-            setDeletingId(userId);
-            try {
-            // Note: In Supabase, deleting from auth.users (via admin API) cascades. 
-            // Since we are client-side, we can only delete from public.profiles if RLS allows, 
-            // but normally this requires a backend function to fully wipe auth user.
-            const { error } = await supabase.from('profiles').delete().eq('id', userId);
-            if (error) throw error;
-            setUsers(prev => prev.filter(u => u.id !== userId));
-            } catch (err: any) { 
-                alert('Không thể xoá người dùng từ phía Client. Vui lòng sử dụng Supabase Dashboard.'); 
-            } finally { setDeletingId(null); }
-        }
-    });
-  };
-
   const SortHeader = ({ label, sortKey, width, textAlign = 'text-left' }: { label: string, sortKey: string, width?: string, textAlign?: string }) => (
     <th style={{ width }} className={`px-4 py-4 text-[11px] font-bold text-slate-400 cursor-pointer hover:bg-slate-100/50 transition-colors ${textAlign}`} onClick={() => handleSort(sortKey)}>
       <div className={`flex items-center gap-1.5 ${textAlign === 'text-center' ? 'justify-center' : textAlign === 'text-right' ? 'justify-end' : ''}`}>
@@ -325,18 +535,26 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ showAlert }) => {
   );
 
   const roleOptions = [
-    {label:'Tất cả chức vụ', value:'ALL', icon: ShieldAlert, style: 'bg-slate-100 text-slate-600 border-slate-200'}, 
-    {label:'Quản trị viên', value:'admin', icon: Shield, style: 'bg-rose-50 text-rose-600 border-rose-100'}, 
+    {label:'Tất cả quyền hạn', value:'ALL', icon: ShieldAlert, style: 'bg-slate-100 text-slate-600 border-slate-200'}, 
+    {label:'Quản trị', value:'admin', icon: Shield, style: 'bg-rose-50 text-rose-600 border-rose-100'}, 
     {label:'Điều phối', value:'manager', icon: Settings, style: 'bg-indigo-50 text-indigo-600 border-indigo-100'}, 
     {label:'Tài xế', value:'driver', icon: Car, style: 'bg-emerald-50 text-emerald-600 border-emerald-100'}, 
     {label:'Thành viên', value:'user', icon: User, style: 'bg-sky-50 text-sky-600 border-sky-100'} 
   ];
 
+  const tierOptions = [
+    {label: 'Tất cả cấp độ', value: 'ALL', icon: Layers},
+    {label: 'Thường', value: 'standard', icon: User},
+    {label: 'Bạc', value: 'silver', icon: Award},
+    {label: 'Vàng', value: 'gold', icon: Trophy},
+    {label: 'Kim Cương', value: 'diamond', icon: Gem},
+    {label: 'Gia Đình', value: 'family', icon: Heart},
+  ];
+
   return (
-    <div className="space-y-4 animate-slide-up">
+    <div className="space-y-4 animate-slide-up relative">
       <div className="bg-gradient-to-br from-emerald-50/80 to-indigo-50/60 p-6 rounded-[32px] border border-emerald-100 shadow-sm space-y-5 backdrop-blur-sm relative z-30">
         <div className="flex flex-col gap-4">
-          {/* ... existing Search/Sort UI ... */}
           <div className="flex flex-col md:flex-row gap-3">
             <div className="flex gap-3 w-full md:flex-1">
                <div className="relative flex-1 group">
@@ -374,15 +592,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ showAlert }) => {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:flex lg:flex-wrap gap-3 w-full">
-            <UnifiedDropdown label="Chức vụ" icon={Shield} value={roleFilter} onChange={setRoleFilter} width="w-full lg:w-48" showCheckbox={true}
+            <UnifiedDropdown label="Quyền hạn" icon={Shield} value={roleFilter} onChange={setRoleFilter} width="w-full lg:w-48" showCheckbox={true}
               isRole={true} roleConfig={roleOptions} options={roleOptions} />
+            <UnifiedDropdown label="Cấp độ" icon={Medal} value={tierFilter} onChange={setTierFilter} width="w-full lg:w-48" showCheckbox={true}
+              options={tierOptions} />
             <UnifiedDropdown label="Hoạt động" icon={CalendarDays} value={activityTimeFilter} onChange={setActivityTimeFilter} width="w-full lg:w-48" showCheckbox={true}
               options={[{label:'Tất cả thời gian', value:'ALL'}, {label:'Hôm nay', value:'TODAY'}, {label:'Hôm qua', value:'YESTERDAY'}, {label:'7 ngày qua', value:'WEEK'}]} />
           </div>
         </div>
       </div>
       
-      {/* Password Reset Modal (Simulated) */}
+      {/* Password Reset Modal */}
       {passwordResetUser && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white w-full max-w-md rounded-[28px] shadow-2xl p-6 relative">
@@ -395,7 +615,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ showAlert }) => {
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-4">
                     <p className="text-xs text-slate-500 mb-1">Người dùng:</p>
                     <p className="font-bold text-slate-800">{passwordResetUser.full_name}</p>
-                    <p className="text-xs text-slate-400">{passwordResetUser.phone || 'Không có SĐT'}</p>
+                    <p className="text-xs text-slate-400">{passwordResetUser.phone ? passwordResetUser.phone.replace(/^\+?84/, '0') : 'Không có SĐT'}</p>
                 </div>
 
                 <div className="space-y-4">
@@ -420,53 +640,215 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ showAlert }) => {
         </div>
       )}
 
-      {/* ... existing Grid View ... */}
-      
-      {/* Desktop Table View (Hidden in Grid Mode) */}
+      {/* Dynamic Bulk Action Bar */}
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-6 fade-in duration-300 w-[95%] md:w-auto">
+            <div className="bg-white/95 backdrop-blur-md text-slate-800 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-slate-200/80 px-2.5 py-2.5 flex items-center gap-2">
+                <div className="flex items-center gap-3 pr-3 border-r border-slate-200 shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-black shadow-md">
+                        {selectedIds.length}
+                    </div>
+                    <span className="text-xs font-bold text-slate-600 hidden md:inline">Đã chọn</span>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                    <div className="w-10 md:w-auto shrink-0">
+                        <UnifiedDropdown 
+                            label="Thao tác" 
+                            icon={Sliders} 
+                            value={bulkActionType}
+                            width="w-full md:w-32"
+                            mobileIconOnly={true}
+                            showCheckbox={false}
+                            direction="up"
+                            options={[
+                                { label: 'Đổi quyền', value: 'ROLE' },
+                                { label: 'Đổi cấp độ', value: 'TIER' },
+                                { label: 'Cài đặt giảm giá', value: 'DISCOUNT' },
+                            ]}
+                            onChange={(val: any) => setBulkActionType(val)}
+                        />
+                    </div>
+
+                    <div className="w-10 md:w-44 shrink-0 relative h-full">
+                        {bulkActionType === 'ROLE' && (
+                            <RoleSelector value={pendingBulkRole} onChange={setPendingBulkRole} compact={true} disabled={isBulkProcessing} direction="up" />
+                        )}
+                        {bulkActionType === 'TIER' && (
+                            <TierSelector value={pendingBulkTier} onChange={setPendingBulkTier} compact={true} disabled={isBulkProcessing} direction="up" />
+                        )}
+                        {bulkActionType === 'DISCOUNT' && (
+                            <ToggleSelector value={pendingBulkDiscount} onChange={setPendingBulkDiscount} label="Giảm giá" direction="up" />
+                        )}
+                    </div>
+                    
+                    <button 
+                        onClick={handleBulkExecute}
+                        disabled={isBulkProcessing}
+                        className="p-2.5 md:px-4 rounded-xl bg-emerald-600 text-white shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all text-xs font-bold flex items-center gap-1.5 shrink-0"
+                    >
+                       {isBulkProcessing ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} <span className="hidden md:inline">Thực hiện</span>
+                    </button>
+
+                    <div className="w-px h-6 bg-slate-200 mx-1"></div>
+
+                    <button 
+                        onClick={handleEditSelected}
+                        disabled={selectedIds.length !== 1 || isBulkProcessing}
+                        className={`p-2.5 rounded-xl border transition-all text-xs font-bold flex items-center gap-1.5 shrink-0 ${
+                            selectedIds.length === 1 && !isBulkProcessing
+                            ? 'bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-100 hover:text-indigo-700' 
+                            : 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed'
+                        }`}
+                        title="Sửa thông tin cơ bản"
+                    >
+                       <Edit3 size={14} /> <span className="hidden md:inline">Sửa</span>
+                    </button>
+                    
+                    <button 
+                        onClick={handleBulkDelete}
+                        disabled={isBulkProcessing}
+                        className="p-2.5 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-100 hover:text-rose-700 transition-all text-xs font-bold flex items-center gap-1.5 shrink-0"
+                        title="Xoá người dùng"
+                    >
+                       {isBulkProcessing ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} <span className="hidden md:inline">Xoá</span>
+                    </button>
+                    
+                    <button 
+                        onClick={() => setSelectedIds([])}
+                        className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors shrink-0 ml-1"
+                        title="Hủy chọn"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* Mobile List View (Cards) */}
+      <div className="md:hidden space-y-3 pb-24">
+        {filteredUsers.length > 0 ? filteredUsers.map(user => {
+            const isSelected = selectedIds.includes(user.id);
+            const userCode = `C${user.id.substring(0,5).toUpperCase()}`;
+            const roleStyle = getRoleStyle(user.role);
+            const tierConfig = getTierConfig(user.membership_tier);
+            const TierIcon = tierConfig.icon;
+            const AvatarIcon = roleStyle.icon;
+            
+            return (
+                <div key={user.id} className={`p-4 rounded-2xl border transition-all ${isSelected ? 'bg-indigo-50 border-indigo-200 shadow-sm' : 'bg-white border-slate-100 shadow-sm'}`} onClick={() => toggleSelectUser(user.id)}>
+                    <div className="flex items-center gap-3">
+                        <div onClick={(e) => e.stopPropagation()}>
+                            <CircleCheckbox checked={isSelected} onChange={() => toggleSelectUser(user.id)} />
+                        </div>
+                        
+                        <div className="relative shrink-0">
+                            <div className={`h-10 w-10 rounded-xl flex items-center justify-center font-bold text-[11px] shrink-0 border border-slate-100 shadow-sm transition-all ${roleStyle.style}`}>
+                                <AvatarIcon size={18} />
+                            </div>
+                            <div className={`absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-black shadow-sm border border-white ${tierConfig.bg} ${tierConfig.color}`}>
+                                <TierIcon size={10} />
+                            </div>
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <h4 className="font-bold text-slate-800 text-sm truncate max-w-[150px]">{user.full_name}</h4>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                        <div className="text-[10px] font-bold text-slate-400">{userCode}</div>
+                                        {user.phone && (
+                                            <div className="flex items-center gap-1.5">
+                                                <a href={`tel:${user.phone}`} onClick={(e) => e.stopPropagation()} className="w-5 h-5 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center hover:bg-emerald-600 hover:text-white transition-all border border-emerald-100 shrink-0">
+                                                    <Phone size={8} />
+                                                </a>
+                                                <CopyableCode code={user.phone || ''} className="text-[9px] font-bold text-indigo-600 truncate" label={user.phone.replace(/^\+?84/, '0') || 'N/A'} />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="flex flex-col items-end gap-1">
+                                    <div className={`px-2 py-0.5 rounded text-[9px] font-bold border ${roleStyle.style} bg-opacity-50 border-opacity-50 flex items-center gap-1`} title={roleStyle.desc}>
+                                        <AvatarIcon size={8} />
+                                        {roleStyle.label}
+                                    </div>
+                                    <div className={`px-2 py-0.5 rounded text-[9px] font-bold border ${tierConfig.bg} ${tierConfig.color} ${tierConfig.border} flex items-center gap-1`} title={tierConfig.desc}>
+                                        <TierIcon size={8} /> {tierConfig.label}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }) : (
+            <div className="px-6 py-20 text-center italic text-slate-500 text-[11px] font-bold">Không tìm thấy người dùng nào</div>
+        )}
+      </div>
+
+      {/* Desktop Table View */}
       <div className={`hidden md:${viewMode === 'list' ? 'block' : 'hidden'} bg-white rounded-[28px] border border-slate-100 shadow-sm overflow-visible min-h-[500px]`}>
         <div className="overflow-x-auto custom-scrollbar">
           <table className="w-full text-left table-fixed min-w-[1400px]">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100">
+                <th className="px-4 py-4 w-[50px] text-center">
+                    <CircleCheckbox 
+                        checked={filteredUsers.length > 0 && filteredUsers.every(u => selectedIds.includes(u.id))}
+                        onChange={toggleSelectAll}
+                    />
+                </th>
                 <SortHeader label="Thành viên & Mã" sortKey="full_name" width="18%" />
-                <SortHeader label="Quyền hạn" sortKey="role" width="12%" textAlign="text-center" />
-                <SortHeader label="Số điện thoại" sortKey="phone" width="12%" />
-                <SortHeader label="Email" sortKey="email" width="15%" />
-                <SortHeader label="Chuyến đi" sortKey="trips_count" width="7%" textAlign="text-center" />
-                <SortHeader label="Chuyến đặt" sortKey="bookings_count" width="7%" textAlign="text-center" />
-                <SortHeader label="Hoạt động" sortKey="last_activity_at" width="10%" textAlign="text-center"/>
-                <SortHeader label="Ngày tham gia" sortKey="created_at" width="10%" textAlign="text-center" />
+                <SortHeader label="Quyền hạn" sortKey="role" width="10%" textAlign="text-center" />
+                <SortHeader label="Cấp độ" sortKey="membership_tier" width="10%" textAlign="text-center" />
+                <SortHeader label="Giảm giá" sortKey="is_discount_provider" width="8%" textAlign="text-center" />
+                <SortHeader label="Số điện thoại" sortKey="phone" width="10%" />
+                <SortHeader label="Email" sortKey="email" width="14%" />
+                <SortHeader label="Chuyến xe" sortKey="trips_count" width="7%" textAlign="text-center" />
+                <SortHeader label="Yêu cầu" sortKey="bookings_count" width="7%" textAlign="text-center" />
+                <SortHeader label="Ngày tham gia" sortKey="created_at" width="9%" textAlign="text-center" />
+                <SortHeader label="Hoạt động" sortKey="last_activity_at" width="9%" textAlign="text-center"/>
                 <th className="px-4 py-4 text-[11px] font-bold text-slate-400 text-right pr-8">Hành động</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {filteredUsers.length > 0 ? filteredUsers.map(user => {
-                // ... existing row logic ...
                 const userCode = `C${user.id.substring(0,5).toUpperCase()}`;
                 const isEditing = editingId === user.id;
-                const avatarStyle = getRoleAvatarStyle(user.role);
-                const AvatarIcon = avatarStyle.icon;
-                const badgeStyle = getBookingBadgeStyle(user.bookings_count);
+                const roleStyle = getRoleStyle(user.role);
+                const AvatarIcon = roleStyle.icon;
                 const tripsColor = getCountLevelStyle(user.trips_count);
                 const bookingsColor = getCountLevelStyle(user.bookings_count);
+                const displayPhone = user.phone ? user.phone.replace(/^\+?84/, '0') : '';
+                const isSelected = selectedIds.includes(user.id);
+                const tierConfig = getTierConfig(user.membership_tier);
+                const TierIcon = tierConfig.icon;
 
                 return (
-                  <tr key={user.id} className={`hover:bg-slate-50/30 transition-colors group/row ${isEditing ? 'bg-indigo-50/20' : ''}`}>
-                    {/* ... existing cells ... */}
+                  <tr key={user.id} className={`transition-colors group/row ${isSelected ? 'bg-indigo-50/40' : 'hover:bg-slate-50/30'} ${isEditing ? 'bg-indigo-50/20' : ''}`} onClick={() => !isEditing && toggleSelectUser(user.id)}>
+                    <td className="px-4 py-4 text-center">
+                        <CircleCheckbox 
+                            checked={isSelected}
+                            onChange={() => toggleSelectUser(user.id)}
+                        />
+                    </td>
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-3">
                         <div className="relative">
-                          <div className={`h-9 w-9 rounded-xl flex items-center justify-center font-bold text-[11px] shrink-0 border border-slate-100 shadow-sm transition-all ${avatarStyle.style}`}>
+                          <div className={`h-9 w-9 rounded-xl flex items-center justify-center font-bold text-[11px] shrink-0 border border-slate-100 shadow-sm transition-all ${roleStyle.style}`}>
                              <AvatarIcon size={16} />
                           </div>
-                          <div className={`absolute -top-1.5 -left-1.5 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black shadow-sm ring-2 ring-white border border-white/50 ${badgeStyle}`} title={`Đã đặt ${user.bookings_count} chuyến`}>
-                            {user.bookings_count}
+                          {/* Avatar Badge replaced by Tier Icon */}
+                          <div className={`absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-black shadow-sm border border-white ${tierConfig.bg} ${tierConfig.color}`}>
+                            <TierIcon size={10} />
                           </div>
                         </div>
                         <div className="min-w-0 flex-1">
                           {isEditing ? (
                             <input 
                               type="text" value={editData.full_name} onChange={e => setEditData({...editData, full_name: e.target.value})}
+                              onClick={(e) => e.stopPropagation()}
                               className="w-full px-2 py-1 text-[12px] font-bold text-slate-800 border border-indigo-200 rounded outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
                             />
                           ) : (
@@ -478,17 +860,42 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ showAlert }) => {
                         </div>
                       </div>
                     </td>
+                    {/* Role Column with Tooltip */}
                     <td className="px-4 py-4 text-center">
-                      <div className="flex justify-center">
-                        <div className="w-32 relative">
-                          {updatingId === user.id && !isEditing ? <div className="flex items-center justify-center py-2 bg-slate-50 rounded-xl border border-slate-100"><Loader2 className="animate-spin text-indigo-500" size={14} /></div> : <RoleSelector value={user.role} onChange={(role) => handleUpdateRole(user.id, role)} />}
+                        <div 
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-bold transition-all shadow-sm ${roleStyle.style}`}
+                            title={roleStyle.desc} 
+                        >
+                            <AvatarIcon size={12} />
+                            {roleStyle.label}
                         </div>
-                      </div>
+                    </td>
+                    {/* Tier Column with Tooltip */}
+                    <td className="px-4 py-4 text-center">
+                        <div 
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-bold transition-all shadow-sm ${tierConfig.bg} ${tierConfig.border} ${tierConfig.color.replace('text-','text-slate-800 ')}`}
+                            title={tierConfig.desc}
+                        >
+                            <TierIcon size={12} className={tierConfig.color} />
+                            {tierConfig.label}
+                        </div>
+                    </td>
+                    {/* Discount Column */}
+                    <td className="px-4 py-4 text-center">
+                        {user.role === 'driver' ? (
+                            user.is_discount_provider ? (
+                                <div className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm" title="Đang bật giảm giá"><Check size={14} /></div>
+                            ) : (
+                                <div className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-50 text-slate-300 border border-slate-100" title="Tắt giảm giá"><X size={14} /></div>
+                            )
+                        ) : (
+                            <span className="text-slate-200">-</span>
+                        )}
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-2">
                         {isEditing ? (
-                          <div className="relative w-full">
+                          <div className="relative w-full" onClick={(e) => e.stopPropagation()}>
                             <Phone size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
                             <input 
                               type="tel" value={editData.phone} onChange={e => setEditData({...editData, phone: e.target.value})}
@@ -498,11 +905,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ showAlert }) => {
                         ) : (
                           <>
                             {user.phone && (
-                              <a href={`tel:${user.phone}`} className="w-6 h-6 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center hover:bg-emerald-600 hover:text-white transition-all border border-emerald-100 shrink-0">
+                              <a href={`tel:${user.phone}`} onClick={(e) => e.stopPropagation()} className="w-6 h-6 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center hover:bg-emerald-600 hover:text-white transition-all border border-emerald-100 shrink-0">
                                  <Phone size={10} />
                               </a>
                             )}
-                            <CopyableCode code={user.phone || ''} className="text-[11px] font-bold text-indigo-600 truncate" label={user.phone || 'N/A'} />
+                            <CopyableCode code={user.phone || ''} className="text-[11px] font-bold text-indigo-600 truncate" label={displayPhone || 'N/A'} />
                           </>
                         )}
                       </div>
@@ -523,6 +930,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ showAlert }) => {
                         {user.bookings_count}
                       </span>
                     </td>
+                    {/* Created At Column */}
+                    <td className="px-4 py-4 text-center">
+                        <span className="text-[10px] font-bold text-slate-500">
+                            {user.created_at ? new Date(user.created_at).toLocaleDateString('vi-VN') : '-'}
+                        </span>
+                    </td>
                     <td className="px-4 py-4 text-center">
                         {user.last_activity_at ? (
                             <div className="inline-flex items-center gap-1.5 bg-sky-50 text-sky-600 px-2 py-1 rounded-lg border border-sky-100 shadow-sm">
@@ -533,38 +946,22 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ showAlert }) => {
                             <span className="text-[10px] font-bold text-slate-400 italic">Chưa có</span>
                         )}
                     </td>
-                    <td className="px-4 py-4 text-center">
-                        {user.created_at ? (
-                            <div className="inline-flex items-center gap-1.5 bg-slate-50 text-slate-500 px-2 py-1 rounded-lg border border-slate-200 shadow-sm">
-                            <CalendarDays size={10} />
-                            <span className="text-[10px] font-bold whitespace-nowrap">{new Date(user.created_at).toLocaleDateString('vi-VN')}</span>
-                            </div>
-                        ) : (
-                            <span className="text-[10px] font-bold text-slate-400">N/A</span>
-                        )}
-                    </td>
                     <td className="px-4 py-4 text-right pr-8">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                         {isEditing ? (
                           <>
                             <button onClick={() => handleSaveInfo(user.id)} className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100"><Check size={14} /></button>
                             <button onClick={() => setEditingId(null)} className="p-1.5 bg-slate-100 text-slate-500 rounded-lg border border-slate-200"><X size={14} /></button>
                           </>
                         ) : (
-                          <>
-                            <button onClick={() => setPasswordResetUser(user)} className="p-1.5 bg-amber-50 text-amber-600 rounded-lg border border-amber-100 hover:bg-amber-600 hover:text-white transition-all" title="Cấp lại mật khẩu"><Key size={14} /></button>
-                            <button onClick={() => handleStartEdit(user)} className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 hover:bg-indigo-600 hover:text-white transition-all"><Edit3 size={14} /></button>
-                            <button onClick={() => handleDeleteUser(user.id, user.full_name)} disabled={deletingId === user.id} className="p-1.5 bg-rose-50 text-rose-600 rounded-lg border border-rose-100 hover:bg-rose-600 hover:text-white transition-all">
-                              {deletingId === user.id ? <Loader2 className="animate-spin" size={14} /> : <Trash2 size={14} />}
-                            </button>
-                          </>
+                          <button onClick={() => setPasswordResetUser(user)} className="p-1.5 bg-amber-50 text-amber-600 rounded-lg border border-amber-100 hover:bg-amber-600 hover:text-white transition-all" title="Cấp lại mật khẩu"><Key size={14} /></button>
                         )}
                       </div>
                     </td>
                   </tr>
                 );
               }) : (
-                <tr><td colSpan={9} className="px-6 py-20 text-center italic text-slate-500 text-[11px] font-bold">Không tìm thấy người dùng nào</td></tr>
+                <tr><td colSpan={11} className="px-6 py-20 text-center italic text-slate-500 text-[11px] font-bold">Không tìm thấy người dùng nào</td></tr>
               )}
             </tbody>
           </table>

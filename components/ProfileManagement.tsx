@@ -4,9 +4,9 @@ import {
   User, Phone, ShieldCheck, Save, Loader2, Clock, 
   CheckCircle2, Navigation, Ticket, ArrowRight, AlertCircle, 
   History, Calendar, LucideIcon, Bookmark, Camera, Car, Shield, Settings, X, Sparkles, MapPin, Copy, LogOut,
-  Timer, Play, Ban, Map as MapIcon, Database, UploadCloud, Lock, Key, Mail, AlertTriangle, Link
+  Timer, Play, Ban, Map as MapIcon, Database, UploadCloud, Lock, Key, Mail, AlertTriangle, Link, Medal, Trophy, Gem, Heart
 } from 'lucide-react';
-import { Profile, UserRole, Trip, Booking } from '../types';
+import { Profile, UserRole, Trip, Booking, MembershipTier } from '../types';
 import { supabase } from '../lib/supabase';
 import CopyableCode from './CopyableCode';
 import { getTripStatusDisplay } from './SearchTrips';
@@ -52,13 +52,23 @@ create policy "Public Update Avatars" on storage.objects for update using ( buck
 create policy "Public Delete Avatars" on storage.objects for delete using ( bucket_id = 'avatars' );
 `;
 
+const getTierConfig = (tier: MembershipTier = 'standard') => {
+    switch (tier) {
+        case 'silver': return { label: 'Bạc', icon: Medal, color: 'text-slate-500', bg: 'bg-slate-100', border: 'border-slate-200', discountVal: 10, discountLabel: '10%' };
+        case 'gold': return { label: 'Vàng', icon: Trophy, color: 'text-amber-500', bg: 'bg-amber-50', border: 'border-amber-100', discountVal: 20, discountLabel: '20%' };
+        case 'diamond': return { label: 'Kim Cương', icon: Gem, color: 'text-cyan-500', bg: 'bg-cyan-50', border: 'border-cyan-100', discountVal: 30, discountLabel: '30%' };
+        case 'family': return { label: 'Gia Đình', icon: Heart, color: 'text-rose-500', bg: 'bg-rose-50', border: 'border-rose-100', discountVal: 100, discountLabel: '100%' };
+        default: return { label: 'Thường', icon: User, color: 'text-slate-400', bg: 'bg-white', border: 'border-slate-100', discountVal: 0, discountLabel: '0%' };
+    }
+};
+
 const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, profile, onUpdate, stats, allTrips, userBookings, onManageVehicles }) => {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false); 
   const [fullName, setFullName] = useState(profile?.full_name || '');
   const [phone, setPhone] = useState(profile?.phone || '');
-  const [email, setEmail] = useState('');
-  const [originalEmail, setOriginalEmail] = useState('');
+  const [email, setEmail] = useState(profile?.email || '');
+  const [originalEmail, setOriginalEmail] = useState(profile?.email || '');
   
   // Password Change State
   const [newPassword, setNewPassword] = useState('');
@@ -79,12 +89,11 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
     if (profile) {
       setFullName(profile.full_name);
       setPhone(profile.phone || '');
-      // Fetch User Email securely
+      // Fetch User Email securely from current session as well
       supabase.auth.getUser().then(({ data }) => {
-        if (data.user?.email) {
-            setEmail(data.user.email);
-            setOriginalEmail(data.user.email);
-        }
+        const userEmail = data.user?.email || profile.email || '';
+        setEmail(userEmail);
+        setOriginalEmail(userEmail);
       });
     }
   }, [profile, isOpen]);
@@ -150,23 +159,29 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
     setLoading(true);
     setMessage(null);
     try {
-      // 1. Update Profile Info (Public Metadata)
-      const { error } = await supabase
+      // 1. Đồng bộ Email & Info vào bảng 'profiles' ngay lập tức
+      const { error: profileError } = await supabase
         .from('profiles')
-        .update({ full_name: fullName, phone: phone })
+        .update({ 
+            full_name: fullName, 
+            phone: phone,
+            email: email.trim() // Đồng bộ Email lên hệ thống công khai
+        })
         .eq('id', profile.id);
-      if (error) throw error;
+      
+      if (profileError) throw profileError;
 
       let authUpdates: any = {};
       let successMsg = 'Cập nhật thông tin thành công!';
+      let requiresReAuth = false;
 
-      // 2. Update Email (Account Linking)
-      if (email && email !== originalEmail) {
-         authUpdates.email = email;
+      // 2. Cập nhật Auth Email (Dành cho đăng nhập)
+      if (email && email.trim() !== originalEmail) {
+         authUpdates.email = email.trim();
          successMsg += ' Vui lòng kiểm tra hộp thư mới để xác nhận liên kết Email.';
       }
 
-      // 3. Update Password
+      // 3. Cập nhật Mật khẩu
       if (newPassword) {
         if (newPassword.length < 6) throw new Error('Mật khẩu mới phải có ít nhất 6 ký tự');
         if (newPassword !== confirmPassword) throw new Error('Mật khẩu xác nhận không khớp');
@@ -175,19 +190,41 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
 
       if (Object.keys(authUpdates).length > 0) {
          const { error: authError } = await supabase.auth.updateUser(authUpdates);
-         if (authError) throw authError;
+         
+         if (authError) {
+             // Xử lý lỗi Session JWT đặc biệt
+             if (authError.message.includes('session_id') || authError.message.includes('JWT')) {
+                 requiresReAuth = true;
+                 throw new Error('Phiên làm việc đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại để cập nhật Email/Mật khẩu.');
+             }
+             throw authError;
+         }
       }
 
       setMessage({ type: 'success', text: successMsg });
       setNewPassword('');
       setConfirmPassword('');
       setIsChangingPassword(false);
-      if (email !== originalEmail) setOriginalEmail(email); // Optimistic update
+      
+      // Cập nhật trạng thái Email gốc để xóa cảnh báo UI
+      if (email.trim() !== originalEmail) {
+          setOriginalEmail(email.trim());
+      }
       
       onUpdate();
-      setTimeout(() => setMessage(null), 5000);
+      setTimeout(() => setMessage(null), 6000);
     } catch (err: any) {
-      setMessage({ type: 'error', text: err.message || 'Đã có lỗi xảy ra.' });
+      console.error("Update error:", err);
+      setMessage({ type: 'error', text: err.message || 'Đã có lỗi xảy ra khi đồng bộ dữ liệu.' });
+      
+      // Nếu là lỗi session, gợi ý làm mới trang
+      if (err.message.includes('đăng nhập lại')) {
+          setTimeout(() => {
+              if (window.confirm("Bạn có muốn đăng xuất và đăng nhập lại ngay bây giờ?")) {
+                  supabase.auth.signOut().then(() => window.location.reload());
+              }
+          }, 2000);
+      }
     } finally {
       setLoading(false);
     }
@@ -311,7 +348,9 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
   const userCode = `C${profile?.id.substring(0, 5).toUpperCase() || '00000'}`;
   const roleInfo = getRoleBadgeConfig(profile?.role);
   const RoleIcon = roleInfo.icon;
-  const isPhoneUser = !originalEmail; // Simplistic check: If no email loaded initially, assume phone user
+  const isPhoneUser = !originalEmail; // Cảnh báo nếu chưa có email
+  const tierConfig = getTierConfig(profile?.membership_tier);
+  const TierIcon = tierConfig.icon;
 
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
@@ -373,6 +412,13 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
                 <div className="flex flex-wrap justify-center md:justify-start gap-2.5">
                    <div className={`px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1.5 border ${roleInfo.bg} ${roleInfo.text} ${roleInfo.border}`}>
                       <RoleIcon size={12} /> {roleInfo.label}
+                   </div>
+
+                   {/* Tier Badge */}
+                   <div className={`px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1.5 border ${tierConfig.bg} ${tierConfig.color.replace('text-','text-slate-800 ')} ${tierConfig.border}`}>
+                      <TierIcon size={12} className={tierConfig.color} /> 
+                      {tierConfig.label} 
+                      {tierConfig.discountVal > 0 && <span className="bg-white/50 px-1 rounded text-emerald-600">-{tierConfig.discountLabel}</span>}
                    </div>
 
                    <div className="group relative">
@@ -483,7 +529,7 @@ const ProfileManagement: React.FC<ProfileManagementProps> = ({ isOpen, onClose, 
                      <div>
                         <label className="text-[10px] font-bold text-slate-400 ml-1 mb-1 block flex justify-between">
                            Email (Dùng để đăng nhập & Khôi phục)
-                           {email && email === originalEmail && <span className="text-emerald-500 flex items-center gap-1"><CheckCircle2 size={10}/> Đã xác thực</span>}
+                           {email && email === originalEmail && originalEmail !== '' && <span className="text-emerald-500 flex items-center gap-1"><CheckCircle2 size={10}/> Đã xác thực</span>}
                         </label>
                         <div className="relative">
                            <input 
