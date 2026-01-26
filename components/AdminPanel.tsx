@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Shield, Search, Phone, Loader2, ArrowUpDown, Trash2, ChevronDown, Check, Car, Ticket, 
-  Trophy, Star, Medal, Zap, CalendarDays, User, Settings, ShieldAlert, Edit3, X, Save, Clock, Crown, LayoutList, LayoutGrid, Key, Mail, CheckSquare, Square, Gem, Heart, Award, ToggleLeft, ToggleRight, Sliders, Layers
+  Trophy, Star, Medal, Zap, CalendarDays, User, Settings, ShieldAlert, Edit3, X, Save, Clock, Crown, LayoutList, LayoutGrid, Key, Mail, CheckSquare, Square, Gem, Heart, Award, ToggleLeft, ToggleRight, Sliders, Layers, Handshake
 } from 'lucide-react';
 import { Profile, UserRole, MembershipTier } from '../types.ts';
 import { supabase } from '../lib/supabase.ts';
@@ -42,7 +42,7 @@ const getTierConfig = (tier: MembershipTier = 'standard') => {
     switch (tier) {
         case 'silver': return { label: 'Bạc', icon: Award, color: 'text-slate-500', bg: 'bg-slate-100', border: 'border-slate-200', discountVal: 10, discountLabel: '10%', desc: 'Ưu đãi cấp độ Bạc: Giảm giá 10% trên tổng hóa đơn (áp dụng tại các đối tác hỗ trợ).' };
         case 'gold': return { label: 'Vàng', icon: Trophy, color: 'text-amber-500', bg: 'bg-amber-50', border: 'border-amber-100', discountVal: 20, discountLabel: '20%', desc: 'Ưu đãi cấp độ Vàng: Giảm giá 20% trên tổng hóa đơn, ưu tiên xử lý yêu cầu khẩn cấp.' };
-        case 'diamond': return { label: 'Kim Cương', icon: Gem, color: 'text-cyan-500', bg: 'bg-cyan-50', border: 'border-cyan-100', discountVal: 30, discountLabel: '30%', desc: 'Ưu đãi Kim Cương: Giảm giá 30%, hỗ trợ chăm sóc khách hàng đặc biệt 24/7.' };
+        case 'diamond': return { label: 'Kim Cương', icon: Gem, color: 'text-cyan-500', bg: 'bg-cyan-50', border: 'border-cyan-100', discountVal: 30, discountLabel: '30%', desc: 'Ưu đãi Kim Cương: Giảm giá 30%, hỗ trợ chăm chăm sóc khách hàng đặc biệt 24/7.' };
         case 'family': return { label: 'Gia Đình', icon: Heart, color: 'text-rose-500', bg: 'bg-rose-50', border: 'border-rose-100', discountVal: 80, discountLabel: '80%', desc: 'Cấp độ Gia Đình: Ưu đãi đặc biệt giảm 80% chi phí cho các thành viên trong nhóm liên kết.' };
         default: return { label: 'Thường', icon: User, color: 'text-slate-400', bg: 'bg-white', border: 'border-slate-100', discountVal: 0, discountLabel: '0%', desc: 'Thành viên mới/Tiêu chuẩn: Tận hưởng dịch vụ kết nối xe tiện chuyến nhanh chóng.' };
     }
@@ -129,7 +129,7 @@ const RoleSelector = ({ value, onChange, disabled, compact = false, direction = 
               className="w-full pl-9 pr-2 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all"
             />
           </div>
-          <div className="space-y-0.5 p-0.5 max-h-56 overflow-y-auto custom-scrollbar">
+          <div className="space-y-0.5 p-0.5 max-h-56 overflow-y-auto custom-scrollbar p-0.5">
             {filteredRoles.length > 0 ? filteredRoles.map((role) => (
               <button key={role.value} type="button" 
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChange(role.value); setIsOpen(false); setSearch(''); }}
@@ -458,7 +458,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ showAlert }) => {
             successMessage = `Đã cập nhật cấp độ cho ${selectedIds.length} người dùng.`;
         } else if (bulkActionType === 'DISCOUNT') {
             updateData = { is_discount_provider: pendingBulkDiscount };
-            successMessage = `Đã ${pendingBulkDiscount ? 'bật' : 'tắt'} giảm giá cho ${selectedIds.length} người dùng.`;
+            successMessage = `Đã ${pendingBulkDiscount ? 'bật' : 'tắt'} ưu đãi cho ${selectedIds.length} người dùng.`;
         }
 
         const { error } = await supabase.from('profiles').update(updateData).in('id', selectedIds);
@@ -665,7 +665,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ showAlert }) => {
                             options={[
                                 { label: 'Đổi quyền', value: 'ROLE' },
                                 { label: 'Đổi cấp độ', value: 'TIER' },
-                                { label: 'Cài đặt giảm giá', value: 'DISCOUNT' },
+                                { label: 'Cài đặt ưu đãi', value: 'DISCOUNT' },
                             ]}
                             onChange={(val: any) => setBulkActionType(val)}
                         />
@@ -679,7 +679,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ showAlert }) => {
                             <TierSelector value={pendingBulkTier} onChange={setPendingBulkTier} compact={true} disabled={isBulkProcessing} direction="up" />
                         )}
                         {bulkActionType === 'DISCOUNT' && (
-                            <ToggleSelector value={pendingBulkDiscount} onChange={setPendingBulkDiscount} label="Giảm giá" direction="up" />
+                            <ToggleSelector value={pendingBulkDiscount} onChange={setPendingBulkDiscount} label="Ưu đãi" direction="up" />
                         )}
                     </div>
                     
@@ -803,7 +803,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ showAlert }) => {
                 <SortHeader label="Thành viên & Mã" sortKey="full_name" width="18%" />
                 <SortHeader label="Quyền hạn" sortKey="role" width="10%" textAlign="text-center" />
                 <SortHeader label="Cấp độ" sortKey="membership_tier" width="10%" textAlign="text-center" />
-                <SortHeader label="Giảm giá" sortKey="is_discount_provider" width="8%" textAlign="text-center" />
+                <SortHeader label="Ưu đãi" sortKey="is_discount_provider" width="8%" textAlign="text-center" />
                 <SortHeader label="Số điện thoại" sortKey="phone" width="10%" />
                 <SortHeader label="Email" sortKey="email" width="14%" />
                 <SortHeader label="Chuyến xe" sortKey="trips_count" width="7%" textAlign="text-center" />
@@ -885,9 +885,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ showAlert }) => {
                     <td className="px-4 py-4 text-center">
                         {user.role === 'driver' ? (
                             user.is_discount_provider ? (
-                                <div className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm" title="Đang bật giảm giá"><Check size={14} /></div>
+                                <div className="text-amber-500" title="Đang bật ưu đãi"><Handshake size={18} /></div>
                             ) : (
-                                <div className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-50 text-slate-300 border border-slate-100" title="Tắt giảm giá"><X size={14} /></div>
+                                <div className="text-slate-200" title="Tắt ưu đãi"><X size={16} /></div>
                             )
                         ) : (
                             <span className="text-slate-200">-</span>

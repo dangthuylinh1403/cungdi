@@ -76,10 +76,10 @@ const App: React.FC = () => {
   }, []);
 
   const fetchTrips = useCallback(async () => {
-    // Fetch bookings(seats_booked, status) to calculate real-time availability
+    // FIX: Thêm 'role' vào query profiles để kiểm tra chính xác đối tác giảm giá
     const { data, error } = await supabase
       .from('trips')
-      .select('*, profiles(full_name, phone), bookings(seats_booked, status)')
+      .select('*, profiles(full_name, phone, role, is_discount_provider), bookings(seats_booked, status)')
       .order('departure_time', { ascending: true });
     
     if (error) return;
@@ -101,8 +101,9 @@ const App: React.FC = () => {
           driver_name: t.profiles?.full_name || 'Người dùng ẩn danh',
           driver_phone: t.profiles?.phone || '',
           trip_code: `T${t.id.substring(0, 5).toUpperCase()}`,
-          bookings_count: activeOffers.length, // Corrected count
-          // Override DB value with calculated value for frontend consistency
+          bookings_count: activeOffers.length, 
+          // FIX: Chỉ hiển thị nhãn giảm giá nếu người đăng là 'driver' và có bật is_discount_provider
+          is_discount_provider: (t.profiles?.role === 'driver' && t.profiles?.is_discount_provider) || false,
           available_seats: realAvailableSeats < 0 ? 0 : realAvailableSeats
         };
       });
@@ -257,12 +258,10 @@ const App: React.FC = () => {
       
       for (const trip of latestTrips || []) {
         // 1. Self-healing: Recalculate available_seats based on CONFIRMED bookings
-        // This fixes any discrepancies between the DB count and actual bookings
         const confirmedBookings = trip.bookings?.filter((b: any) => b.status === 'CONFIRMED') || [];
         const bookedSeats = confirmedBookings.reduce((sum: number, b: any) => sum + b.seats_booked, 0);
         const realAvailable = trip.seats - bookedSeats;
         
-        // Only update if there is a mismatch (Prevent infinite loop of updates)
         if (realAvailable !== trip.available_seats) {
            await supabase.from('trips').update({ available_seats: realAvailable }).eq('id', trip.id);
            hasGlobalChanges = true;
@@ -282,7 +281,6 @@ const App: React.FC = () => {
           if (diffMins <= 60 && diffMins > 0) targetStatus = TripStatus.URGENT;
           else targetStatus = TripStatus.PREPARING;
           
-          // Use real calculated availability for FULL status check
           if (realAvailable <= 0) targetStatus = TripStatus.FULL;
         }
         
@@ -313,6 +311,21 @@ const App: React.FC = () => {
   const pendingOrderCount = useMemo(() => {
     return staffBookings.filter(b => b.status === 'PENDING').length;
   }, [staffBookings]);
+  
+  const activeTripsCount = useMemo(() => {
+    if (!profile) return 0;
+    const nonTerminalTripStatus: TripStatus[] = [TripStatus.PREPARING, TripStatus.URGENT, TripStatus.FULL, TripStatus.ON_TRIP];
+    const myActiveTrips = trips.filter(t => t.driver_id === profile.id && nonTerminalTripStatus.includes(t.status)).length;
+    return myActiveTrips;
+  }, [trips, profile]);
+
+  const activeBookingsCount = useMemo(() => {
+    if (!profile) return 0;
+    const nonTerminalBookingStatus = ['PENDING', 'CONFIRMED', 'PICKED_UP', 'ON_BOARD'];
+    const myActiveBookings = bookings.filter(b => nonTerminalBookingStatus.includes(b.status)).length;
+    return myActiveBookings;
+  }, [bookings, profile]);
+
 
   const handlePostTrip = async (tripsToPost: any[]) => {
     if (!user) return;
@@ -427,6 +440,8 @@ const App: React.FC = () => {
         onLoginClick={() => setIsAuthModalOpen(true)} 
         onProfileClick={() => !user ? setIsAuthModalOpen(true) : setIsProfileModalOpen(true)}
         pendingOrderCount={pendingOrderCount}
+        activeTripsCount={activeTripsCount}
+        activeBookingsCount={activeBookingsCount}
       >
         <div className="animate-slide-up">{renderContent()}</div>
       </Layout>

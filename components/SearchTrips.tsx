@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Search as SearchIcon, MapPin, Calendar, Clock, User, ChevronRight, Star, LayoutGrid, CalendarDays, ChevronDown, Car, CarFront, Sparkles, Crown, DollarSign, ArrowUpDown, Filter, Check, X, History, Users, ArrowRight, AlertCircle, Timer, Zap, CheckCircle2, Play, Radio, Shield, Settings, Hash, Navigation, ClipboardList, Repeat, Send, Loader2, Map as MapIcon, Plus, Info, Ban, ListChecks, Ticket, Layers } from 'lucide-react';
+import { Search as SearchIcon, MapPin, Calendar, Clock, User, ChevronRight, Star, LayoutGrid, CalendarDays, ChevronDown, Car, CarFront, Sparkles, Crown, DollarSign, ArrowUpDown, Filter, Check, X, History, Users, ArrowRight, AlertCircle, Timer, Zap, CheckCircle2, Play, Radio, Shield, Settings, Hash, Navigation, ClipboardList, Repeat, Send, Loader2, Map as MapIcon, Plus, Info, Ban, ListChecks, Ticket, Layers, Gem, Handshake } from 'lucide-react';
 import { Trip, TripStatus, Booking, Profile } from '../types';
 import CopyableCode from './CopyableCode.tsx';
 import { getRouteDetails } from '../services/geminiService.ts';
@@ -392,7 +392,16 @@ export const TripCard: React.FC<TripCardProps> = ({ trip, onBook, userBookings =
             <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold border shrink-0 ${isRequest ? 'bg-orange-600 border-orange-100' : 'bg-indigo-600 border-indigo-100'}`}>
               {cardTitle?.charAt(0) || 'U'}
             </div>
-            <h4 className="font-bold text-slate-900 text-[13px] leading-tight truncate flex-1">{cardTitle}</h4>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                  <h4 className="font-bold text-slate-900 text-[13px] leading-tight truncate">{cardTitle}</h4>
+                  {trip.is_discount_provider && !isRequest && (
+                  <div className="text-amber-500 flex items-center gap-1 shrink-0" title="Đối tác Ưu đãi">
+                      <Handshake size={12} />
+                  </div>
+                  )}
+              </div>
+            </div>
           </div>
           
           {isRequest ? (

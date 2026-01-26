@@ -53,6 +53,7 @@ export interface Trip {
   // Phân biệt: true = Khách tìm xe, false/undefined = Tài xế tìm khách
   is_request?: boolean;
   bookings_count?: number;
+  is_discount_provider?: boolean;
 }
 
 export interface Booking {

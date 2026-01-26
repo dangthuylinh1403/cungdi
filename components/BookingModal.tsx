@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-// FIX: Import `Loader2` icon from lucide-react.
-import { X, Phone, User, MapPin, Users, CreditCard, AlertCircle, CheckCircle2, Sparkles, Info, Navigation, Calendar, Clock, ArrowRight, Car, Map, ShieldCheck, Wifi, Snowflake, Droplets, Star, Award, Copy, GripVertical, Crown, Check, Search, Ticket, Wallet, MessageSquare, ChevronDown, Play, Timer, Zap, Gem, Trophy, Heart, Medal, UserSearch, Loader2 } from 'lucide-react';
+import { X, Phone, User, MapPin, Users, CreditCard, AlertCircle, CheckCircle2, Sparkles, Info, Navigation, Calendar, Clock, ArrowRight, Car, Map, ShieldCheck, Wifi, Snowflake, Droplets, Star, Award, Copy, GripVertical, Crown, Check, Search, Ticket, Wallet, MessageSquare, ChevronDown, Play, Timer, Zap, Gem, Trophy, Heart, Medal, UserSearch, Loader2, Handshake } from 'lucide-react';
 import { Trip, Profile, TripStatus, MembershipTier } from '../types';
 import CopyableCode from './CopyableCode';
 import { getVehicleConfig, getTripStatusDisplay } from './SearchTrips';
@@ -86,8 +85,13 @@ const BookingModal: React.FC<BookingModalProps> = ({ trip, profile, isOpen, onCl
       
       const fetchDriverDetails = async () => {
         if (!trip.driver_id) return;
-        const { data: driverProfile } = await supabase.from('profiles').select('is_discount_provider').eq('id', trip.driver_id).single();
-        if (driverProfile) setDriverIsProvider(driverProfile.is_discount_provider || false);
+        // FIX: Lấy thêm 'role' để kiểm tra quyền hạn tài xế
+        const { data: driverProfile } = await supabase.from('profiles').select('role, is_discount_provider').eq('id', trip.driver_id).single();
+        // FIX: Chỉ kích hoạt giảm giá nếu đúng là Tài xế và có bật chế độ ưu đãi
+        if (driverProfile) {
+            setDriverIsProvider((driverProfile.role === 'driver' && driverProfile.is_discount_provider) || false);
+        }
+        
         if (!trip.is_request && trip.vehicle_info) {
             const parts = trip.vehicle_info.split(' (');
             if (parts.length > 1) {
@@ -237,7 +241,6 @@ const BookingModal: React.FC<BookingModalProps> = ({ trip, profile, isOpen, onCl
   
   const vehicleRaw = trip.vehicle_info || '';
   const vehicleParts = vehicleRaw.split(' (');
-  // FIX: Change `const` to `let` to allow reassignment.
   let vehicleModel = vehicleParts[0] || '---';
   if (vehicleModel === 'Cần bao xe') { vehicleModel = 'Cần tìm xe'; }
   const licensePlate = vehicleParts[1] ? vehicleParts[1].replace(')', '') : '';
@@ -285,7 +288,7 @@ const BookingModal: React.FC<BookingModalProps> = ({ trip, profile, isOpen, onCl
 
   const TripDriverInfoCard = ({ className = "" }) => (
     !isRequest ? (
-         <div className={`bg-white rounded-[24px] border border-emerald-100 p-5 shadow-sm space-y-3 flex flex-col justify-center ${className}`}><div className="flex items-center justify-between"><div className="flex items-center gap-2"><ShieldCheck size={16} className="text-emerald-500" /><h4 className="text-xs font-bold text-slate-800">Thông tin xe & tài xế</h4></div>{driverIsProvider && (<div className="px-2 py-0.5 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black border border-rose-100 flex items-center gap-1"><Gem size={9} /> Đối tác giảm giá</div>)}</div><div className="flex items-center gap-4"><div className="relative"><div className="w-12 h-12 rounded-xl bg-slate-100 overflow-hidden border border-slate-200"><div className="w-full h-full flex items-center justify-center bg-emerald-50 text-emerald-300"><User size={20} /></div></div><div className="absolute -bottom-1 -right-1 bg-yellow-400 text-white p-0.5 rounded-full border border-white shadow-sm"><Crown size={8} fill="currentColor" /></div></div><div className="flex-1"><div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-800">Tài xế {trip.driver_name?.split(' ').pop()}</span><span className="px-1.5 py-0.5 bg-yellow-50 text-yellow-600 border border-yellow-100 rounded text-[9px] font-bold flex items-center gap-0.5">5.0 <Star size={8} fill="currentColor" /></span></div><p className="text-[10px] text-slate-400 mt-0.5">Thành viên Đối tác • 150+ Chuyến</p></div></div><div className="h-px bg-slate-100 w-full"></div><div className="flex gap-4"><div className="w-20 h-12 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden relative">{vehicleImage ? (<img src={vehicleImage} alt="Xe" className="w-full h-full object-cover" />) : (<Car size={20} className="text-slate-300" />)}</div><div className="flex-1"><p className="text-xs font-bold text-slate-800 mb-1">Tiện ích trên xe</p><div className="flex flex-wrap gap-1.5"><div className="flex items-center gap-1 text-[9px] font-bold text-slate-600 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100"><Wifi size={10} className="text-blue-500" /> Wifi</div><div className="flex items-center gap-1 text-[9px] font-bold text-slate-600 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100"><Snowflake size={10} className="text-cyan-500" /> Điều hoà</div><div className="flex items-center gap-1 text-[9px] font-bold text-slate-600 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100"><Droplets size={10} className="text-blue-400" /> Nước</div></div></div></div></div>
+         <div className={`bg-white rounded-[24px] border border-emerald-100 p-5 shadow-sm space-y-3 flex flex-col justify-center ${className}`}><div className="flex items-center justify-between"><div className="flex items-center gap-2"><ShieldCheck size={16} className="text-emerald-500" /><h4 className="text-xs font-bold text-slate-800">Thông tin xe & tài xế</h4></div>{driverIsProvider && (<div className="text-amber-500 text-[10px] font-black flex items-center gap-1"><Handshake size={14} /> Đối tác Ưu đãi</div>)}</div><div className="flex items-center gap-4"><div className="relative"><div className="w-12 h-12 rounded-xl bg-slate-100 overflow-hidden border border-slate-200"><div className="w-full h-full flex items-center justify-center bg-emerald-50 text-emerald-300"><User size={20} /></div></div><div className="absolute -bottom-1 -right-1 bg-yellow-400 text-white p-0.5 rounded-full border border-white shadow-sm"><Crown size={8} fill="currentColor" /></div></div><div className="flex-1"><div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-800">Tài xế {trip.driver_name?.split(' ').pop()}</span><span className="px-1.5 py-0.5 bg-yellow-50 text-yellow-600 border border-yellow-100 rounded text-[9px] font-bold flex items-center gap-0.5">5.0 <Star size={8} fill="currentColor" /></span></div><p className="text-[10px] text-slate-400 mt-0.5">Thành viên Đối tác • 150+ Chuyến</p></div></div><div className="h-px bg-slate-100 w-full"></div><div className="flex gap-4"><div className="w-20 h-12 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden relative">{vehicleImage ? (<img src={vehicleImage} alt="Xe" className="w-full h-full object-cover" />) : (<Car size={20} className="text-slate-300" />)}</div><div className="flex-1"><p className="text-xs font-bold text-slate-800 mb-1">Tiện ích trên xe</p><div className="flex flex-wrap gap-1.5"><div className="flex items-center gap-1 text-[9px] font-bold text-slate-600 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100"><Wifi size={10} className="text-blue-500" /> Wifi</div><div className="flex items-center gap-1 text-[9px] font-bold text-slate-600 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100"><Snowflake size={10} className="text-cyan-500" /> Điều hoà</div><div className="flex items-center gap-1 text-[9px] font-bold text-slate-600 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100"><Droplets size={10} className="text-blue-400" /> Nước</div></div></div></div></div>
     ) : null
   );
 
