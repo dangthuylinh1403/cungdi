@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Shield, Search, Phone, Loader2, ArrowUpDown, Trash2, ChevronDown, Check, Car, Ticket, 
@@ -42,7 +43,7 @@ const getTierConfig = (tier: MembershipTier = 'standard') => {
         case 'silver': return { label: 'Bạc', icon: Award, color: 'text-slate-500', bg: 'bg-slate-100', border: 'border-slate-200', discountVal: 10, discountLabel: '10%', desc: 'Ưu đãi cấp độ Bạc: Giảm giá 10% trên tổng hóa đơn (áp dụng tại các đối tác hỗ trợ).' };
         case 'gold': return { label: 'Vàng', icon: Trophy, color: 'text-amber-500', bg: 'bg-amber-50', border: 'border-amber-100', discountVal: 20, discountLabel: '20%', desc: 'Ưu đãi cấp độ Vàng: Giảm giá 20% trên tổng hóa đơn, ưu tiên xử lý yêu cầu khẩn cấp.' };
         case 'diamond': return { label: 'Kim Cương', icon: Gem, color: 'text-cyan-500', bg: 'bg-cyan-50', border: 'border-cyan-100', discountVal: 30, discountLabel: '30%', desc: 'Ưu đãi Kim Cương: Giảm giá 30%, hỗ trợ chăm sóc khách hàng đặc biệt 24/7.' };
-        case 'family': return { label: 'Gia Đình', icon: Heart, color: 'text-rose-500', bg: 'bg-rose-50', border: 'border-rose-100', discountVal: 100, discountLabel: '100%', desc: 'Cấp độ Gia Đình: Ưu đãi đặc biệt giảm 100% chi phí cho các thành viên trong nhóm liên kết.' };
+        case 'family': return { label: 'Gia Đình', icon: Heart, color: 'text-rose-500', bg: 'bg-rose-50', border: 'border-rose-100', discountVal: 80, discountLabel: '80%', desc: 'Cấp độ Gia Đình: Ưu đãi đặc biệt giảm 80% chi phí cho các thành viên trong nhóm liên kết.' };
         default: return { label: 'Thường', icon: User, color: 'text-slate-400', bg: 'bg-white', border: 'border-slate-100', discountVal: 0, discountLabel: '0%', desc: 'Thành viên mới/Tiêu chuẩn: Tận hưởng dịch vụ kết nối xe tiện chuyến nhanh chóng.' };
     }
 };

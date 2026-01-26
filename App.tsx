@@ -341,7 +341,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleConfirmBooking = async (data: { phone: string; seats: number; note: string }) => {
+  const handleConfirmBooking = async (data: { phone: string; seats: number; note: string; passengerId?: string }) => {
     if (!selectedTrip || !user) return;
     const { data: latestTrip } = await supabase.from('trips').select('available_seats, status, departure_time').eq('id', selectedTrip.id).single();
     if (latestTrip && (latestTrip.status === TripStatus.CANCELLED || latestTrip.status === TripStatus.COMPLETED || new Date(latestTrip.departure_time) < new Date())) {
@@ -349,15 +349,16 @@ const App: React.FC = () => {
       return;
     }
     
-    // Check seats but DO NOT deduct them yet for PENDING
     if (!selectedTrip.is_request && latestTrip && latestTrip.available_seats < data.seats) {
       showAlert({ title: 'Không đủ chỗ', message: `Chuyến xe chỉ còn ${latestTrip.available_seats} ghế trống. Vui lòng chọn lại số lượng.`, variant: 'warning', confirmText: 'Đã hiểu' });
       return;
     }
 
+    const passengerIdForBooking = data.passengerId || user.id;
+
     const { error: bookingError } = await supabase.from('bookings').insert({
       trip_id: selectedTrip.id, 
-      passenger_id: user.id, 
+      passenger_id: passengerIdForBooking, 
       passenger_phone: data.phone,
       seats_booked: data.seats, 
       total_price: selectedTrip.price * data.seats, 
@@ -368,11 +369,10 @@ const App: React.FC = () => {
     if (bookingError) {
       showAlert({ title: 'Đặt chỗ thất bại', message: bookingError.message, variant: 'danger', confirmText: 'Đóng' });
     } else {
-      // Logic changed: PENDING booking does NOT reduce available_seats immediately.
-      // Seats are deducted only when status becomes CONFIRMED by driver.
       setIsBookingModalOpen(false);
       refreshAllData();
-      setActiveTab('my-requests'); 
+      const tabToActivate = (profile?.role === 'admin' || profile?.role === 'manager') ? 'manage-orders' : 'my-requests';
+      setActiveTab(tabToActivate);
     }
   };
 
