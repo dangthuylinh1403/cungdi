@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Search as SearchIcon, MapPin, Calendar, Clock, User, ChevronRight, Star, LayoutGrid, CalendarDays, ChevronDown, Car, CarFront, Sparkles, Crown, DollarSign, ArrowUpDown, Filter, Check, X, History, Users, ArrowRight, AlertCircle, Timer, Zap, CheckCircle2, Play, Radio, Shield, Settings, Hash, Navigation, ClipboardList, Repeat, Send, Loader2, Map as MapIcon, Plus, Info, Ban, ListChecks, Ticket, Layers } from 'lucide-react';
 import { Trip, TripStatus, Booking, Profile } from '../types';
 import CopyableCode from './CopyableCode.tsx';
@@ -273,7 +274,6 @@ export const TripCard: React.FC<TripCardProps> = ({ trip, onBook, userBookings =
 
   const createdAtDate = trip.created_at ? new Date(trip.created_at) : null;
   const createdAtTime = createdAtDate ? createdAtDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--:--';
-  // FIX: Force dd/mm format instead of relying on default locale which might use dashes
   const createdAtDay = createdAtDate ? `${String(createdAtDate.getDate()).padStart(2, '0')}/${String(createdAtDate.getMonth() + 1).padStart(2, '0')}` : '--/--';
 
   const totalSeatsBooked = useMemo(() => {
@@ -301,7 +301,6 @@ export const TripCard: React.FC<TripCardProps> = ({ trip, onBook, userBookings =
   const bookedSeats = trip.seats - trip.available_seats;
   const fillPercentage = trip.seats > 0 ? (bookedSeats / trip.seats) * 100 : 0;
 
-  // Adjust display for Passenger Request
   const isRequest = trip.is_request;
   const cardTitle = trip.driver_name;
   
@@ -309,11 +308,11 @@ export const TripCard: React.FC<TripCardProps> = ({ trip, onBook, userBookings =
   if (isRequest) {
     const bookingsCount = trip.bookings_count || 0;
     if (bookingsCount === 0) {
-      fillBarColor = 'bg-slate-200'; // 0 xe nhận: Màu trắng/xám
+      fillBarColor = 'bg-slate-200';
     } else if (bookingsCount === 1) {
-      fillBarColor = 'bg-emerald-500'; // 1 xe nhận: Màu xanh lá
+      fillBarColor = 'bg-emerald-500';
     } else {
-      fillBarColor = 'bg-rose-500'; // >1 xe nhận: Màu đỏ
+      fillBarColor = 'bg-rose-500';
     }
   } else {
     if (bookedSeats <= 0) {
@@ -322,163 +321,45 @@ export const TripCard: React.FC<TripCardProps> = ({ trip, onBook, userBookings =
       fillBarColor = 'bg-emerald-500';
     } else if (fillPercentage < 100) {
       fillBarColor = 'bg-amber-500';
-    } else { // fillPercentage >= 100
+    } else {
       fillBarColor = 'bg-rose-500';
     }
   }
   
   const renderBookingButton = () => {
-    // 1. Owner view
     if (isTripOwner) {
-      if (isCompleted) {
-        return (
-          <button
-            disabled
-            className="w-full h-10 flex items-center justify-center gap-2 rounded-xl bg-slate-200 text-slate-500 font-bold text-xs cursor-not-allowed"
-          >
-            <CheckCircle2 size={14} />
-            Chuyến đã kết thúc
-          </button>
-        );
-      }
-      if (isCancelled) {
-        return (
-          <button
-            disabled
-            className="w-full h-10 flex items-center justify-center gap-2 rounded-xl bg-slate-200 text-slate-500 font-bold text-xs cursor-not-allowed"
-          >
-            <X size={14} />
-            Chuyến đã huỷ
-          </button>
-        );
-      }
-      return (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onViewTripDetails(trip); }}
-          className="w-full h-10 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all"
-        >
-          <ClipboardList size={14} />
-          Kiểm tra đặt chỗ
-        </button>
-      );
+      if (isCompleted) return <button disabled className="w-full h-10 flex items-center justify-center gap-2 rounded-xl bg-slate-200 text-slate-500 font-bold text-xs cursor-not-allowed"><CheckCircle2 size={14} /> Chuyến đã kết thúc</button>;
+      if (isCancelled) return <button disabled className="w-full h-10 flex items-center justify-center gap-2 rounded-xl bg-slate-200 text-slate-500 font-bold text-xs cursor-not-allowed"><X size={14} /> Chuyến đã huỷ</button>;
+      return <button type="button" onClick={(e) => { e.stopPropagation(); onViewTripDetails(trip); }} className="w-full h-10 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all"><ClipboardList size={14} /> Kiểm tra đặt chỗ</button>;
     }
 
-    // 2. Already booked (by current user)
     if (hasBooked) {
-      // For passenger requests, drivers can only "accept" once. So view details is correct.
-      if (isRequest) {
-        return (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onViewTripDetails(trip); }}
-            className="w-full h-10 flex items-center justify-center gap-2 rounded-xl bg-rose-600 text-white font-bold text-xs shadow-lg shadow-rose-200 transition-all"
-          >
-            <CheckCircle2 size={14} />
-            Đã nhận chuyến
-          </button>
-        );
-      }
-      
-      // For standard driver trips, check if more bookings are possible.
+      if (isRequest) return <button type="button" onClick={(e) => { e.stopPropagation(); onViewTripDetails(trip); }} className="w-full h-10 flex items-center justify-center gap-2 rounded-xl bg-rose-600 text-white font-bold text-xs shadow-lg shadow-rose-200 transition-all"><CheckCircle2 size={14} /> Đã nhận chuyến</button>;
       const isBookable = !isFull && !isOngoing && !isCompleted && !isCancelled;
       if (isBookable) {
-        // Show split button: View bookings + Book more
         return (
           <div className="grid grid-cols-5 gap-2">
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onViewTripDetails(trip); }}
-              className="col-span-2 w-full h-10 flex items-center justify-center gap-1 rounded-xl bg-rose-100 text-rose-700 font-bold text-[10px] hover:bg-rose-200 transition-all"
-            >
-              <Ticket size={12} />
-              Xem vé ({totalSeatsBooked})
-            </button>
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onBook(trip.id); }}
-              className="col-span-3 w-full h-10 flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 text-white font-bold text-xs shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all animate-pulse-blue"
-            >
-              <Zap size={12} />
-              Đặt thêm
-            </button>
+            <button type="button" onClick={(e) => { e.stopPropagation(); onViewTripDetails(trip); }} className="col-span-2 w-full h-10 flex items-center justify-center gap-1 rounded-xl bg-rose-100 text-rose-700 font-bold text-[10px] hover:bg-rose-200 transition-all"><Ticket size={12} /> Xem vé ({totalSeatsBooked})</button>
+            <button type="button" onClick={(e) => { e.stopPropagation(); onBook(trip.id); }} className="col-span-3 w-full h-10 flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 text-white font-bold text-xs shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all animate-pulse-blue"><Zap size={12} /> Đặt thêm</button>
           </div>
         );
       }
-      
-      // Fallback: If trip is booked but no longer bookable (e.g., completed), show the original status button.
-      return (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onViewTripDetails(trip); }}
-          className="w-full h-10 flex items-center justify-center gap-2 rounded-xl bg-rose-600 text-white font-bold text-xs shadow-lg shadow-rose-200 transition-all"
-        >
-          <Clock size={14} />
-          Đã đặt {totalSeatsBooked} ghế
-        </button>
-      );
+      return <button type="button" onClick={(e) => { e.stopPropagation(); onViewTripDetails(trip); }} className="w-full h-10 flex items-center justify-center gap-2 rounded-xl bg-rose-600 text-white font-bold text-xs shadow-lg shadow-rose-200 transition-all"><Clock size={14} /> Đã đặt {totalSeatsBooked} ghế</button>;
     }
     
-    // 3. Not bookable states
-    if (isCompleted) {
-       return (
-        <button disabled className="w-full h-10 flex items-center justify-center gap-2 rounded-xl bg-slate-200 text-slate-500 font-bold text-xs cursor-not-allowed">
-          <Ban size={14} />
-          Chuyến đã kết thúc
-        </button>
-       );
-    }
-    if (isCancelled) {
-       return (
-        <button disabled className="w-full h-10 flex items-center justify-center gap-2 rounded-xl bg-slate-200 text-slate-500 font-bold text-xs cursor-not-allowed">
-          <Ban size={14} />
-          Chuyến đã huỷ
-        </button>
-       );
-    }
-    if (isOngoing) {
-       return (
-        <button disabled className="w-full h-10 flex items-center justify-center gap-2 rounded-xl bg-slate-200 text-slate-500 font-bold text-xs cursor-not-allowed">
-          <Ban size={14} />
-          Xe đang chạy
-        </button>
-       );
-    }
+    if (isCompleted) return <button disabled className="w-full h-10 flex items-center justify-center gap-2 rounded-xl bg-slate-200 text-slate-500 font-bold text-xs cursor-not-allowed"><Ban size={14} /> Chuyến đã kết thúc</button>;
+    if (isCancelled) return <button disabled className="w-full h-10 flex items-center justify-center gap-2 rounded-xl bg-slate-200 text-slate-500 font-bold text-xs cursor-not-allowed"><Ban size={14} /> Chuyến đã huỷ</button>;
+    if (isOngoing) return <button disabled className="w-full h-10 flex items-center justify-center gap-2 rounded-xl bg-slate-200 text-slate-500 font-bold text-xs cursor-not-allowed"><Ban size={14} /> Xe đang chạy</button>;
 
-
-    // 4. Trip is full (standby)
     if (isFull) {
-      return (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onBook(trip.id); }}
-          className="w-full h-10 flex items-center justify-center gap-2 rounded-xl bg-orange-500 text-white font-bold text-xs shadow-lg shadow-orange-200 hover:bg-orange-600 transition-all animate-pulse-orange"
-        >
-          <Users size={14} />
-          Đặt dự phòng
-        </button>
-      );
+      return <button type="button" onClick={(e) => { e.stopPropagation(); onBook(trip.id); }} className="w-full h-10 flex items-center justify-center gap-2 rounded-xl bg-orange-500 text-white font-bold text-xs shadow-lg shadow-orange-200 hover:bg-orange-600 transition-all animate-pulse-orange"><Users size={14} /> Đặt dự phòng</button>;
     }
 
-    // 5. Default bookable state
-    return (
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); onBook(trip.id); }}
-        className="w-full h-10 flex items-center justify-center gap-2 rounded-xl bg-blue-600 text-white font-bold text-xs shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all animate-pulse-blue"
-      >
-        <Zap size={14} />
-        Đặt chỗ ngay
-      </button>
-    );
+    return <button type="button" onClick={(e) => { e.stopPropagation(); onBook(trip.id); }} className="w-full h-10 flex items-center justify-center gap-2 rounded-xl bg-blue-600 text-white font-bold text-xs shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all animate-pulse-blue"><Zap size={14} /> Đặt chỗ ngay</button>;
   };
 
-
   return (
-    <div 
-      className={`bg-white p-4 rounded-[24px] border shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group overflow-hidden relative flex flex-col cursor-pointer ${isOngoing ? 'border-blue-200 bg-blue-50/20' : isUrgent ? 'border-rose-400 bg-rose-50/20' : isPreparing ? 'border-amber-300 bg-amber-50/10' : 'border-slate-100'} ${isCompleted || isCancelled ? 'opacity-80' : ''}`}
-    >
-      
+    <div className={`bg-white p-4 rounded-[24px] border shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group overflow-hidden relative flex flex-col cursor-pointer ${isOngoing ? 'border-blue-200 bg-blue-50/20' : isUrgent ? 'border-rose-400 bg-rose-50/20' : isPreparing ? 'border-amber-300 bg-amber-50/10' : 'border-slate-100'} ${isCompleted || isCancelled ? 'opacity-80' : ''}`}>
       <div>
         <div className="flex items-center justify-between mb-3">
           <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[9px] font-bold z-10 ${statusInfo.style}`}>
@@ -615,6 +496,18 @@ interface SearchTripsProps {
   onPostClick: (mode: 'DRIVER' | 'PASSENGER') => void; 
 }
 
+// Section Header Component
+const SectionHeader = ({ icon: Icon, title, count, color = 'text-emerald-600', bgColor = 'bg-emerald-100' }: any) => (
+  <div className="flex items-center gap-3">
+    <div className={`p-2 rounded-xl ${bgColor} ${color}`}>
+      <Icon size={18} />
+    </div>
+    <h3 className="text-lg font-bold text-slate-800">{title}</h3>
+    <span className="text-sm font-bold text-slate-400">({count} chuyến)</span>
+    <hr className="flex-1 border-dashed border-slate-200" />
+  </div>
+);
+
 const SearchTrips: React.FC<SearchTripsProps> = ({ trips, onBook, userBookings, profile, onViewTripDetails, onPostClick }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [vehicleFilter, setVehicleFilter] = useState<string[]>(['ALL']);
@@ -623,10 +516,8 @@ const SearchTrips: React.FC<SearchTripsProps> = ({ trips, onBook, userBookings, 
   const [destinationFilter, setDestinationFilter] = useState<string[]>(['ALL']); 
   const [sortOrder, setSortOrder] = useState('TIME_ASC'); 
   const [loading, setLoading] = useState(true);
-  
-  // Request Mode State (Switch between Available Trips and Passenger Requests)
   const [isRequestMode, setIsRequestMode] = useState(false);
-
+  
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 800);
     return () => clearInterval(timer);
@@ -644,15 +535,13 @@ const SearchTrips: React.FC<SearchTripsProps> = ({ trips, onBook, userBookings, 
     return [{ label: 'Tất cả điểm đến', value: 'ALL' }, ...Array.from(destinations).map(name => ({ label: name, value: name }))];
   }, [trips]);
 
-
   const filteredTrips = useMemo(() => {
     const searchNormalized = removeAccents(searchTerm);
     let result = trips.filter(t => {
-      // Logic for Mode: Handle potential undefined/null by forcing boolean
       const isTripRequest = !!t.is_request;
       
-      if (isRequestMode && !isTripRequest) return false; // In Request Mode, hide Driver Trips
-      if (!isRequestMode && isTripRequest) return false; // In Driver Mode, hide Requests
+      if (isRequestMode && !isTripRequest) return false;
+      if (!isRequestMode && isTripRequest) return false;
 
       const tripCode = t.trip_code || (t.id ? `T${t.id.substring(0, 5).toUpperCase()}` : '');
       const matchesSearch = removeAccents(t.origin_name).includes(searchNormalized) || 
@@ -669,6 +558,7 @@ const SearchTrips: React.FC<SearchTripsProps> = ({ trips, onBook, userBookings, 
       return matchesSearch && matchesVehicle && matchesStatus && matchesOrigin && matchesDestination;
     });
 
+    // Default sort is always by status priority then time
     result.sort((a, b) => {
       const timeA = new Date(a.departure_time).getTime();
       const timeB = new Date(b.departure_time).getTime();
@@ -694,8 +584,59 @@ const SearchTrips: React.FC<SearchTripsProps> = ({ trips, onBook, userBookings, 
     return result;
   }, [trips, searchTerm, vehicleFilter, statusFilter, originFilter, destinationFilter, sortOrder, isRequestMode]); 
 
+  const groupedTrips = useMemo(() => {
+    const today: Trip[] = [];
+    const thisMonth: Trip[] = [];
+    const future: Trip[] = [];
+    const past: Trip[] = [];
+    
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    for (const trip of filteredTrips) {
+      const departureDate = new Date(trip.departure_time);
+      
+      // If a trip is completed, it's considered in the past, regardless of date.
+      if (trip.status === TripStatus.COMPLETED) {
+        past.push(trip);
+        continue;
+      }
+
+      if (departureDate < startOfToday) {
+        past.push(trip);
+      } else if (departureDate >= startOfToday && departureDate <= endOfToday) {
+        today.push(trip);
+      } else if (departureDate > endOfToday && departureDate <= endOfMonth) {
+        thisMonth.push(trip);
+      } else {
+        future.push(trip);
+      }
+    }
+    
+    // Sort past trips in reverse chronological order (newest past trips first)
+    past.sort((a, b) => new Date(b.departure_time).getTime() - new Date(a.departure_time).getTime());
+
+    return { today, thisMonth, future, past };
+  }, [filteredTrips]);
+
+  const renderTripGroup = (group: Trip[], title: string, icon: React.ElementType, colors: any) => {
+    if (group.length === 0) return null;
+    return (
+        <section className="space-y-5">
+            <SectionHeader icon={icon} title={title} count={group.length} color={colors.color} bgColor={colors.bgColor} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5 items-start">
+                {group.map(trip => (
+                    <TripCard key={trip.id} trip={trip} onBook={onBook} userBookings={userBookings} profile={profile} onViewTripDetails={onViewTripDetails} />
+                ))}
+            </div>
+        </section>
+    );
+  };
+
   return (
-    <div className="space-y-3 pb-20 animate-slide-up max-w-[1600px] mx-auto">
+    <div className="space-y-6 pb-20 animate-slide-up max-w-[1600px] mx-auto">
       {/* Pill Toggle Switcher - Centered */}
       <div className="flex justify-center items-center gap-3 relative z-40">
         <div className="flex bg-white p-1 rounded-full border border-slate-200 shadow-sm w-fit">
@@ -718,9 +659,7 @@ const SearchTrips: React.FC<SearchTripsProps> = ({ trips, onBook, userBookings, 
       <div className={`bg-gradient-to-br p-5 rounded-[32px] border shadow-sm space-y-4 backdrop-blur-sm relative z-30 ${isRequestMode ? 'from-orange-50/80 to-white border-orange-100' : 'from-emerald-50/80 to-white border-emerald-100'}`}>
         <div className="flex flex-col gap-4">
           
-          {/* Top Row: Search + Sort + Create */}
           <div className="flex flex-col md:flex-row gap-3">
-            {/* Search Input Group - Improved for Desktop & Mobile */}
             <div className="flex gap-3 w-full md:flex-1">
                <div className="relative flex-1 group">
                   <SearchIcon className={`absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors ${isRequestMode ? 'group-focus-within:text-orange-600' : 'group-focus-within:text-emerald-600'}`} size={16} />
@@ -732,7 +671,6 @@ const SearchTrips: React.FC<SearchTripsProps> = ({ trips, onBook, userBookings, 
                   />
                </div>
                
-               {/* Sort Dropdown - Responsive sizing (Mobile: 50/50, Desktop: w-48) */}
                <div className="flex-1 md:w-48 md:flex-none shrink-0">
                   <UnifiedDropdown 
                     label="Sắp xếp" icon={ArrowUpDown} value={sortOrder} width="w-full" showCheckbox={false}
@@ -746,7 +684,6 @@ const SearchTrips: React.FC<SearchTripsProps> = ({ trips, onBook, userBookings, 
                </div>
             </div>
 
-            {/* Create Button: Hidden on Mobile, Visible on Desktop */}
             <button 
               onClick={() => onPostClick(isRequestMode ? 'PASSENGER' : 'DRIVER')}
               className={`hidden md:flex h-[42px] px-4 rounded-xl text-xs font-bold transition-all items-center justify-center gap-2 shadow-sm hover:shadow-md border border-transparent whitespace-nowrap ${
@@ -760,7 +697,6 @@ const SearchTrips: React.FC<SearchTripsProps> = ({ trips, onBook, userBookings, 
             </button>
           </div>
 
-          {/* Hàng 2: Các bộ lọc (Grid 2 cột mobile, 3 cột tablet, flex desktop) */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:flex lg:flex-wrap gap-3 w-full">
             <UnifiedDropdown 
               label="Trạng thái" icon={ClipboardList} value={statusFilter} width="w-full lg:w-48" showCheckbox={true}
@@ -794,12 +730,19 @@ const SearchTrips: React.FC<SearchTripsProps> = ({ trips, onBook, userBookings, 
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5 items-start min-h-[400px]">
+      <div className="space-y-10 min-h-[400px]">
         {loading ? (
-          Array.from({ length: 8 }).map((_, i) => <TripCardSkeleton key={i} />)
-        ) : filteredTrips.length > 0 ? filteredTrips.map(trip => (
-          <TripCard key={trip.id} trip={trip} onBook={onBook} userBookings={userBookings} profile={profile} onViewTripDetails={onViewTripDetails} />
-        )) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
+            {Array.from({ length: 8 }).map((_, i) => <TripCardSkeleton key={i} />)}
+          </div>
+        ) : filteredTrips.length > 0 ? (
+            <>
+              {renderTripGroup(groupedTrips.today, 'Hôm nay', CalendarDays, { color: 'text-emerald-600', bgColor: 'bg-emerald-100' })}
+              {renderTripGroup(groupedTrips.thisMonth, 'Trong tháng này', Calendar, { color: 'text-sky-600', bgColor: 'bg-sky-100' })}
+              {renderTripGroup(groupedTrips.future, 'Tương lai', Send, { color: 'text-indigo-600', bgColor: 'bg-indigo-100' })}
+              {renderTripGroup(groupedTrips.past, 'Quá khứ', History, { color: 'text-slate-500', bgColor: 'bg-slate-100' })}
+            </>
+        ) : (
           <div className="col-span-full py-20 text-center bg-white rounded-[32px] border border-dashed border-slate-200">
              <AlertCircle size={40} className="mx-auto text-slate-300 mb-3" />
              <p className="text-xs font-bold text-slate-500 uppercase">
