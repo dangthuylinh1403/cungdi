@@ -1,8 +1,11 @@
+
+// FIX: Import useState from 'react' to resolve 'Cannot find name 'useState'' error.
 import React, { useState } from 'react';
 import {
-  X, BookOpen, Clock, Play, CheckCircle2, XCircle, AlertCircle, Timer,
-  Search, Navigation, Zap, Sparkles, Car, Ticket, Shield, Users,
-  User, Settings, LayoutDashboard, ClipboardList, ShoppingBag, ArrowRight, Layers, HelpCircle, ListChecks
+  X, HelpCircle, Clock, Play, CheckCircle2, XCircle, AlertCircle, Timer,
+  Search, Navigation, Zap, Car, Ticket, Shield, Users,
+  Settings, LayoutDashboard, ClipboardList, ShoppingBag, ArrowRight,
+  ListChecks, FileText, User, Handshake, Gem, Trophy, Award, Heart, PlusCircle, CreditCard, Key
 } from 'lucide-react';
 import { Profile, UserRole } from '../types';
 
@@ -21,7 +24,7 @@ interface StatusBadgeProps {
 }
 
 const StatusBadge: React.FC<StatusBadgeProps> = ({ icon: Icon, label, style, description }) => (
-  <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-lg transition-all duration-300 group">
+  <div className="p-4 bg-white rounded-2xl border border-slate-100 hover:shadow-lg transition-all duration-300 group">
     <div className="mb-3 flex justify-between items-center">
       <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg border text-[9px] font-bold ${style}`}>
         <Icon size={10} />
@@ -63,7 +66,7 @@ const Step = ({ number, title, children }: {number: string | number, title: stri
 const TripStatusGuide = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {[
-        { label: 'Chờ', icon: Clock, style: 'bg-amber-50 text-amber-600 border-amber-100', description: 'Chuyến xe vừa được đăng, còn nhiều thời gian (> 6 tiếng) để nhận khách.' },
+        { label: 'Chờ', icon: Clock, style: 'bg-amber-50 text-amber-500 border-amber-100', description: 'Chuyến xe vừa được đăng, còn nhiều thời gian (> 6 tiếng) để nhận khách.' },
         { label: 'Chuẩn bị', icon: Timer, style: 'bg-amber-50 text-amber-600 border-amber-100', description: 'Tự động kích hoạt khi còn 6 tiếng nữa khởi hành. Thẻ chuyến đi sẽ có viền Vàng.' },
         { label: 'Sát giờ', icon: AlertCircle, style: 'bg-rose-50 text-rose-600 border-rose-100', description: 'Tự động kích hoạt khi còn 1 tiếng nữa khởi hành. Thẻ chuyến đi có viền Đỏ khẩn cấp.' },
         { label: 'Đang chạy', icon: Play, style: 'bg-blue-50 text-blue-600 border-blue-100', description: 'Tự động kích hoạt khi đến giờ khởi hành. Chuyến xe bắt đầu di chuyển.' },
@@ -84,9 +87,9 @@ const TripStatusGuide = () => (
 const BookingStatusGuide = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {[
-        { label: 'Chờ duyệt', icon: Clock, style: 'bg-amber-50 text-amber-600 border-amber-100', description: 'Hành khách vừa đặt chỗ. Tài xế cần xem xét và phản hồi.' },
+        { label: 'Chờ duyệt', icon: Clock, style: 'bg-amber-50 text-amber-600 border-amber-100', description: 'Bạn đã gửi yêu cầu. Tài xế cần xem xét và phản hồi.' },
         { label: 'Xác nhận', icon: CheckCircle2, style: 'bg-emerald-50 text-emerald-600 border-emerald-100', description: 'Tài xế đã đồng ý đón. Hệ thống tự động trừ số ghế trống trên chuyến.' },
-        { label: 'Huỷ', icon: XCircle, style: 'bg-rose-50 text-rose-500 border-rose-100', description: 'Hành khách hoặc tài xế đã hủy đơn. Nếu đơn đã xác nhận, ghế sẽ được hoàn lại.' },
+        { label: 'Huỷ', icon: XCircle, style: 'bg-rose-50 text-rose-500 border-rose-100', description: 'Bạn hoặc tài xế đã hủy đơn. Nếu đơn đã được xác nhận, ghế sẽ được hoàn trả.' },
       ].map((status, idx) => (
         <StatusBadge
           key={idx}
@@ -102,44 +105,68 @@ const BookingStatusGuide = () => (
 // --- Role-specific Content ---
 const UserContent = () => (
   <div className="space-y-10">
-    <GuideSection title="Tìm kiếm & Đặt chỗ" description="Khám phá các chuyến đi phù hợp hoặc tạo yêu cầu của riêng bạn." icon={Search} borderColor="border-sky-500">
-      <Step number={1} title="Tìm kiếm chuyến xe có sẵn">
-        <p>Tại tab <b className="text-emerald-600">"Chuyến xe có sẵn"</b>, bạn có thể tìm các chuyến do tài xế đăng. Sử dụng thanh tìm kiếm (hỗ trợ không dấu) và các bộ lọc (Loại xe, Điểm đi, Điểm đến) để tìm chuyến đi phù hợp nhất.</p>
+    <GuideSection title="Dành cho Hành khách" description="Tìm kiếm chuyến đi phù hợp hoặc đăng tin tìm xe nhanh chóng." icon={Users} borderColor="border-sky-500">
+      <Step number={1} title="Tìm kiếm & Lọc chuyến xe">
+        <p>Tại tab <b className="text-emerald-600">"Chuyến xe có sẵn"</b>, bạn có thể tìm các chuyến do tài xế đăng. Thanh tìm kiếm hỗ trợ tìm theo địa điểm (cả không dấu), mã chuyến, tên tài xế.</p>
+        <p>Sử dụng các bộ lọc <b className="text-slate-700">Trạng thái, Loại xe, Điểm đi, Điểm đến</b> để thu hẹp kết quả. Nút <b className="text-slate-700">Sắp xếp</b> giúp bạn ưu tiên chuyến xe theo thời gian hoặc giá cả.</p>
       </Step>
-      <Step number={2} title="Tạo yêu cầu tìm xe">
-        <p>Nếu không tìm thấy chuyến phù hợp, chuyển qua tab <b className="text-orange-600">"Yêu cầu chuyến xe"</b> và nhấn nút <b className="text-orange-600">"Đăng yêu cầu mới"</b>. Các tài xế có lộ trình tương tự sẽ thấy và liên hệ với bạn.</p>
+      <Step number={2} title="Đặt chỗ">
+        <p>Sau khi chọn chuyến ưng ý, nhấn nút <b className="text-blue-600">"Đặt chỗ ngay"</b>. Một cửa sổ sẽ hiện ra để bạn điền thông tin chi tiết:</p>
+        <ul className="list-disc list-inside text-xs space-y-1 pl-2">
+            <li><b className="text-slate-800">Điểm đón/trả mong muốn:</b> Ghi rõ địa chỉ cụ thể để tài xế tiện liên lạc.</li>
+            <li><b className="text-slate-800">Số lượng vé:</b> Chọn số ghế bạn cần.</li>
+            <li><b className="text-slate-800">Lời nhắn:</b> Ghi chú thêm nếu cần (VD: có hành lý, có trẻ em...).</li>
+        </ul>
+        <p>Đơn hàng của bạn sẽ ở trạng thái <b className="text-amber-600">"Chờ duyệt"</b> và được chuyển đến tài xế.</p>
       </Step>
-      <Step number={3} title="Đặt chỗ & Theo dõi">
-        <p>Sau khi chọn chuyến, nhấn <b className="text-blue-600">"Đặt chỗ ngay"</b>, điền thông tin điểm đón/trả chi tiết. Đơn hàng của bạn sẽ ở trạng thái <b className="text-amber-600">"Chờ duyệt"</b>. Theo dõi trạng thái đơn hàng tại tab <b className="text-indigo-600">"Yêu cầu"</b>.</p>
+      <Step number={3} title="Đăng yêu cầu tìm xe">
+        <p>Nếu không có chuyến nào phù hợp, chuyển sang tab <b className="text-orange-600">"Yêu cầu chuyến xe"</b> và nhấn nút <b className="text-orange-600">"Đăng yêu cầu mới"</b>.</p>
+        <p>Điền đầy đủ thông tin về lộ trình, thời gian, số lượng người. Mục <b className="text-slate-800">"Ngân sách dự kiến"</b> cho phép bạn đặt mức giá mong muốn hoặc chọn <b className="text-orange-600">"Giá thoả thuận"</b> để tài xế tự đề xuất giá.</p>
+        <p>Các tài xế có lộ trình tương tự sẽ thấy và liên hệ với bạn.</p>
+      </Step>
+       <Step number={4} title="Quản lý & Theo dõi">
+        <p>Tất cả các chuyến bạn đã đặt hoặc các yêu cầu bạn đã đăng được quản lý tại tab <b className="text-indigo-600">"Yêu cầu"</b>. Tại đây bạn có thể theo dõi trạng thái đơn hàng (đã được duyệt hay chưa) và có thể tự <b className="text-rose-600">hủy đơn</b> nếu cần.</p>
       </Step>
     </GuideSection>
-    <GuideSection title="Giải thích Trạng thái Đơn hàng" description="Hiểu rõ các trạng thái của yêu cầu đặt chỗ bạn đã tạo." icon={Ticket} borderColor="border-sky-500">
-        <BookingStatusGuide />
+    <GuideSection title="Cấp độ thành viên & Ưu đãi" description="Tích lũy chuyến đi để nâng hạng và nhận các đặc quyền hấp dẫn." icon={Gem} borderColor="border-sky-500">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatusBadge icon={Award} label="Bạc" style="bg-slate-100 text-slate-500 border-slate-200" description="Giảm 10% khi đặt xe từ các Đối tác Ưu đãi." />
+            <StatusBadge icon={Trophy} label="Vàng" style="bg-amber-50 text-amber-600 border-amber-100" description="Giảm 20% khi đặt xe từ các Đối tác Ưu đãi." />
+            <StatusBadge icon={Gem} label="Kim Cương" style="bg-cyan-50 text-cyan-600 border-cyan-100" description="Giảm 30% khi đặt xe từ các Đối tác Ưu đãi." />
+            <StatusBadge icon={Heart} label="Gia Đình" style="bg-rose-50 text-rose-600 border-rose-100" description="Ưu đãi đặc biệt giảm đến 80% chi phí." />
+        </div>
+        <p className="text-xs text-slate-600 pl-1">Lưu ý: Giảm giá chỉ áp dụng khi bạn đặt xe từ tài xế có huy hiệu <b className="text-amber-600 inline-flex items-center gap-1"><Handshake size={12}/> Đối tác Ưu đãi</b>.</p>
     </GuideSection>
   </div>
 );
 
 const DriverContent = () => (
     <div className="space-y-10">
-    <GuideSection title="Đăng & Quản lý chuyến xe" description="Tạo và quản lý các chuyến đi của bạn một cách hiệu quả." icon={Car} borderColor="border-emerald-500">
+    <GuideSection title="Dành cho Tài xế" description="Tối ưu hóa thu nhập bằng cách quản lý chuyến đi và nhận khách hiệu quả." icon={Car} borderColor="border-emerald-500">
       <Step number={1} title="Quản lý đội xe">
-        <p>Trước tiên, vào <b className="text-slate-700">Hồ sơ &gt; Quản lý đội xe</b> để thêm các phương tiện bạn sở hữu. Thông tin này sẽ được sử dụng khi đăng chuyến.</p>
+        <p>Đây là bước đầu tiên và quan trọng nhất. Truy cập <b className="text-slate-700">Hồ sơ &gt; Quản lý đội xe</b> để thêm thông tin các phương tiện bạn sở hữu.</p>
+        <p>Mỗi xe cần có <b className="text-slate-800">Loại xe, Biển kiểm soát</b> và <b className="text-rose-600">bắt buộc phải có hình ảnh</b>. Hình ảnh sẽ được tự động cắt vuông và nén để tối ưu hiển thị.</p>
       </Step>
       <Step number={2} title="Đăng chuyến mới">
-        <p>Vào tab <b className="text-slate-700">"Đăng chuyến"</b>, chọn <b className="text-indigo-600">"Tôi có xe trống"</b>. Điền đầy đủ thông tin lộ trình, thời gian, giá vé và chọn xe. Sử dụng tính năng <b className="text-slate-700">"Lịch đi định kỳ"</b> cho các tuyến cố định hàng tuần.</p>
+        <p>Vào tab <b className="text-slate-700">"Đăng chuyến"</b>, chọn chế độ <b className="text-indigo-600">"Tôi có xe trống"</b>. Điền đầy đủ thông tin và chọn xe từ danh sách đã thêm ở bước 1.</p>
+        <p>Tính năng <b className="text-slate-700">"Lịch đi định kỳ"</b> giúp bạn nhanh chóng tạo nhiều chuyến cho các tuyến cố định trong tuần mà không cần nhập lại.</p>
       </Step>
-      <Step number={3} title="Nhận yêu cầu từ khách">
-         <p>Kiểm tra tab <b className="text-orange-600">"Yêu cầu chuyến xe"</b>. Nếu có yêu cầu phù hợp với lộ trình của bạn, bạn có thể nhấn "Xác nhận đón" để tạo một đơn hàng mới cho yêu cầu đó.</p>
+      <Step number={3} title="Nhận yêu cầu từ khách (2 cách)">
+        <p><b className="text-slate-800">Cách 1 (Chủ động):</b> Truy cập tab <b className="text-orange-600">"Yêu cầu chuyến xe"</b>, nơi hiển thị các nhu cầu tìm xe từ hành khách. Nếu thấy lộ trình phù hợp, nhấn <b className="text-indigo-600">"Nhận chuyến ngay"</b> để gửi báo giá và thông tin xe của bạn cho khách.</p>
+        <p><b className="text-slate-800">Cách 2 (Bị động):</b> Khách hàng sẽ tìm thấy chuyến xe bạn đã đăng (ở bước 2) và đặt chỗ trực tiếp. Yêu cầu của họ sẽ được chuyển đến bạn.</p>
       </Step>
     </GuideSection>
-    <GuideSection title="Xử lý Đơn hàng & Logic hệ thống" description="Hiểu cách hệ thống tự động cập nhật và cách duyệt đơn của khách." icon={ListChecks} borderColor="border-emerald-500">
-       <Step number="💡" title="Duyệt đơn hàng">
-          <p>Tất cả các yêu cầu đặt chỗ từ hành khách sẽ hiển thị ở tab <b className="text-slate-700">Quản lý &gt; Quản lý Yêu cầu</b>. Bạn có thể <b className="text-emerald-600">Xác nhận</b> hoặc <b className="text-rose-600">Từ chối</b>.</p>
-          <p className="font-bold text-emerald-700">Logic quan trọng: Khi bạn "Xác nhận", số ghế trống trên chuyến xe sẽ tự động bị trừ đi. Nếu số ghế về 0, chuyến xe sẽ chuyển sang trạng thái "Đầy chỗ".</p>
+    <GuideSection title="Quản lý Vận hành" description="Xử lý đơn hàng, theo dõi chuyến đi và các logic tự động của hệ thống." icon={ListChecks} borderColor="border-emerald-500">
+       <Step number="✅" title="Duyệt đơn & Logic trừ ghế">
+          <p>Tất cả các yêu cầu đặt chỗ hoặc yêu cầu nhận chuyến của bạn đều tập trung tại <b className="text-slate-700">Quản lý &gt; Quản lý Yêu cầu</b>. Bạn có quyền <b className="text-emerald-600">Xác nhận</b> hoặc <b className="text-rose-600">Hủy</b> đơn hàng.</p>
+          <p className="font-bold text-emerald-700">Logic quan trọng: Khi bạn "Xác nhận" một đơn, số ghế trống trên chuyến xe tương ứng sẽ tự động bị trừ đi. Nếu số ghế về 0, chuyến xe sẽ chuyển sang trạng thái "Đầy chỗ". Ngược lại, khi bạn "Hủy" một đơn đã xác nhận, số ghế sẽ được hoàn trả.</p>
        </Step>
        <Step number="⚙️" title="Vòng đời chuyến xe tự động">
-           <p>Hệ thống sẽ tự động thay đổi trạng thái chuyến xe của bạn dựa trên thời gian thực để thu hút khách hàng hiệu quả hơn:</p>
+           <p>Trạng thái chuyến xe của bạn sẽ tự động thay đổi theo thời gian thực để tối ưu việc tìm kiếm khách:</p>
             <TripStatusGuide />
+       </Step>
+       <Step number="⭐" title="Trở thành Đối tác Ưu đãi">
+           <p>Trong <b className="text-slate-700">Hồ sơ</b>, bạn có thể bật chế độ <b className="text-amber-600">"Đối tác Ưu đãi"</b>. Khi bật, các hành khách có Cấp độ thành viên (Bạc, Vàng...) sẽ được tự động giảm giá khi đặt chuyến của bạn, giúp thu hút nhiều khách hàng hơn.</p>
        </Step>
     </GuideSection>
   </div>
@@ -147,20 +174,34 @@ const DriverContent = () => (
 
 const StaffContent = ({ role }: { role: 'manager' | 'admin' }) => (
     <div className="space-y-10">
-    <GuideSection title="Tổng quan & Giám sát" description="Theo dõi sức khỏe toàn bộ hệ thống và các chỉ số quan trọng." icon={LayoutDashboard} borderColor={role === 'admin' ? 'border-rose-500' : 'border-indigo-500'}>
-      <p className="text-xs text-slate-600">Tab <b className={role === 'admin' ? 'text-rose-600' : 'text-indigo-600'}>"Thống kê"</b> cung cấp cho bạn cái nhìn toàn cảnh về doanh thu, số lượng chuyến xe, và tỷ lệ lấp đầy. Đây là công cụ chính để đánh giá hiệu quả hoạt động.</p>
-    </GuideSection>
-    <GuideSection title="Quản lý Vận hành" description="Bạn có toàn quyền xem và điều chỉnh mọi hoạt động trên hệ thống." icon={ClipboardList} borderColor={role === 'admin' ? 'border-rose-500' : 'border-indigo-500'}>
-        <Step number={1} title="Quản lý Chuyến xe">
-            <p>Tại <b className={role === 'admin' ? 'text-rose-600' : 'text-indigo-600'}>Quản lý &gt; Quản lý Chuyến xe</b>, bạn có thể xem, chỉnh sửa hoặc hủy bất kỳ chuyến xe nào của tài xế. Chức năng này hữu ích trong việc hỗ trợ tài xế hoặc xử lý các trường hợp khẩn cấp.</p>
-        </Step>
-        <Step number={2} title="Quản lý Yêu cầu">
-            <p>Tại <b className={role === 'admin' ? 'text-rose-600' : 'text-indigo-600'}>Quản lý &gt; Quản lý Yêu cầu</b>, bạn có thể xem và thay đổi trạng thái của mọi đơn hàng trong hệ thống, giúp giải quyết các khiếu nại hoặc sai sót.</p>
-        </Step>
+    <GuideSection title={role === 'admin' ? "Dành cho Quản trị viên" : "Dành cho Điều phối viên"} description="Giám sát, điều phối và quản lý toàn bộ hoạt động của hệ thống." icon={LayoutDashboard} borderColor={role === 'admin' ? 'border-rose-500' : 'border-indigo-500'}>
+      <Step number={1} title="Bảng điều khiển (Thống kê)">
+         <p>Cung cấp cái nhìn tổng quan về các chỉ số quan trọng: <b className="text-slate-800">Doanh thu, Chuyến xe, Yêu cầu, Tỷ lệ lấp đầy</b>. Biểu đồ giúp theo dõi tăng trưởng và hiệu quả hoạt động theo thời gian.</p>
+      </Step>
+      <Step number={2} title="Quản lý Chuyến xe">
+         <p>Tại <b className="text-slate-800">Quản lý &gt; Quản lý Chuyến xe</b>, bạn có thể xem tất cả các chuyến xe (cả tin đăng tìm khách và tin đăng tìm xe) trong hệ thống. Bạn có quyền xem chi tiết và thay đổi trạng thái của bất kỳ chuyến nào (VD: Hủy một chuyến xe gặp sự cố).</p>
+      </Step>
+      <Step number={3} title="Quản lý Yêu cầu">
+         <p>Đây là trung tâm quản lý tất cả các đơn hàng. Bạn có thể lọc đơn theo nhiều tiêu chí và có toàn quyền thay đổi trạng thái của bất kỳ đơn hàng nào để hỗ trợ tài xế và hành khách.</p>
+         <p>Tính năng <b className="text-indigo-600">"Đặt hộ"</b> trong cửa sổ đặt vé cho phép bạn thay mặt một thành viên đã có trong hệ thống để đặt vé, rất hữu ích khi hỗ trợ qua điện thoại.</p>
+      </Step>
     </GuideSection>
     {role === 'admin' && (
-      <GuideSection title="Quản trị Hệ thống (Admin)" description="Quản lý người dùng và các thiết lập cấp cao." icon={Shield} borderColor="border-rose-500">
-          <p className="text-xs text-slate-600">Tab <b className="text-rose-600">"Hệ thống"</b> cho phép bạn xem danh sách tất cả người dùng, thay đổi vai trò của họ (ví dụ: nâng cấp một 'Thành viên' lên 'Tài xế'), hoặc xóa người dùng khỏi hệ thống.</p>
+      <GuideSection title="Quản trị Hệ thống (Admin)" description="Quản lý người dùng và các thiết lập cấp cao của hệ thống." icon={Shield} borderColor="border-rose-500">
+          <Step number="👤" title="Quản lý người dùng">
+            <p>Tab <b className="text-rose-600">"Hệ thống"</b> là nơi quản lý toàn bộ tài khoản. Bạn có thể:</p>
+            <ul className="list-disc list-inside text-xs space-y-1 pl-2">
+                <li>Tìm kiếm và lọc người dùng theo nhiều tiêu chí.</li>
+                <li>Thay đổi <b className="text-slate-800">Quyền hạn</b> (VD: nâng cấp thành viên lên tài xế).</li>
+                <li>Thay đổi <b className="text-slate-800">Cấp độ thành viên</b>.</li>
+                <li>Bật/Tắt chế độ <b className="text-amber-600">Đối tác Ưu đãi</b> cho tài xế.</li>
+                <li>Sử dụng <b className="text-indigo-600">Hành động hàng loạt</b> để cập nhật nhiều người dùng cùng lúc.</li>
+                <li><b className="text-rose-600">Xóa</b> người dùng khỏi hệ thống.</li>
+            </ul>
+          </Step>
+          <Step number="🔑" title="Cấp lại mật khẩu">
+             <p>Trong bảng quản lý người dùng, bạn có thể nhấn vào biểu tượng <b className="text-amber-600"><Key size={12}/></b> để lấy <b className="text-slate-800">User ID</b> của người dùng. Dùng ID này trong trang quản trị <b className="text-indigo-600">Supabase Auth</b> để đặt lại mật khẩu cho họ khi cần.</p>
+          </Step>
       </GuideSection>
     )}
   </div>
@@ -168,21 +209,36 @@ const StaffContent = ({ role }: { role: 'manager' | 'admin' }) => (
 
 
 const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose, profile }) => {
-  const [activeTab, setActiveTab] = useState(profile?.role || 'user');
+  const userRole = profile?.role || 'user';
+  // Admin sees all tabs, others see content relevant to their roles up to their level
+  const isAdmin = userRole === 'admin';
+  const isManager = userRole === 'manager';
+  const isDriver = userRole === 'driver';
 
-  const visibleRoles: UserRole[] = ['user', 'driver'];
-  if (profile?.role === 'manager' || profile?.role === 'admin') visibleRoles.push('manager');
-  if (profile?.role === 'admin') visibleRoles.push('admin');
-  
+  const [activeTab, setActiveTab] = useState(userRole);
+
   if (!isOpen) return null;
 
   const renderContent = () => {
+    // For non-admins, show their specific guide directly
+    if (!isAdmin && !isManager && !isDriver) return <UserContent />;
+    if (!isAdmin && !isManager && isDriver) return <DriverContent />;
+    if (!isAdmin && isManager) {
+        switch (activeTab) {
+            case 'user': return <UserContent />;
+            case 'driver': return <DriverContent />;
+            case 'manager': return <StaffContent role="manager" />;
+            default: return <StaffContent role="manager" />;
+        }
+    }
+    
+    // For admin, allow switching
     switch (activeTab) {
       case 'user': return <UserContent />;
       case 'driver': return <DriverContent />;
       case 'manager': return <StaffContent role="manager" />;
       case 'admin': return <StaffContent role="admin" />;
-      default: return <UserContent />;
+      default: return <StaffContent role="admin" />;
     }
   };
 
@@ -195,6 +251,19 @@ const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose, profil
       default: return { label: 'Hành khách', icon: Users, color: 'text-sky-600' };
     }
   };
+  
+  // Determine which tabs to show
+  const visibleRoles: UserRole[] = [];
+  if (isAdmin) {
+      visibleRoles.push('admin', 'manager', 'driver', 'user');
+  } else if (isManager) {
+      visibleRoles.push('manager', 'driver', 'user');
+  } else if (isDriver) {
+      visibleRoles.push('driver', 'user');
+  }
+  
+  const showTabs = isAdmin || isManager || isDriver;
+  const singleRoleInfo = getRoleInfo(userRole);
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md animate-in fade-in duration-300">
@@ -215,25 +284,32 @@ const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose, profil
             </div>
             <div>
               <h2 className="font-bold text-slate-800">Hướng dẫn</h2>
-              <p className="text-xs text-slate-400">Theo vai trò</p>
+              <p className="text-xs text-slate-400">{showTabs ? 'Theo vai trò' : `Dành cho ${singleRoleInfo.label}`}</p>
             </div>
           </div>
-          <nav className="flex md:flex-col gap-1.5 overflow-x-auto pb-2 md:pb-0">
-            {visibleRoles.map(role => {
-              const { label, icon: Icon, color } = getRoleInfo(role);
-              const isActive = activeTab === role;
-              return (
-                <button 
-                  key={role} 
-                  onClick={() => setActiveTab(role)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all text-left text-xs font-bold whitespace-nowrap ${isActive ? `bg-emerald-50 text-emerald-600 shadow-sm` : `text-slate-500 hover:bg-slate-100 hover:text-slate-800`}`}
-                >
-                  <Icon size={16} className={isActive ? color : 'text-slate-400'} />
-                  {label}
-                </button>
-              );
-            })}
-          </nav>
+          {showTabs ? (
+            <nav className="flex md:flex-col gap-1.5 overflow-x-auto pb-2 md:pb-0">
+              {visibleRoles.map(role => {
+                const { label, icon: Icon, color } = getRoleInfo(role);
+                const isActive = activeTab === role;
+                return (
+                  <button 
+                    key={role} 
+                    onClick={() => setActiveTab(role)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all text-left text-xs font-bold whitespace-nowrap ${isActive ? `bg-emerald-50 text-emerald-600 shadow-sm` : `text-slate-500 hover:bg-slate-100 hover:text-slate-800`}`}
+                  >
+                    <Icon size={16} className={isActive ? color : 'text-slate-400'} />
+                    {label}
+                  </button>
+                );
+              })}
+            </nav>
+          ) : (
+            <div className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold bg-emerald-50 text-emerald-600 shadow-sm`}>
+                <singleRoleInfo.icon size={16} className={singleRoleInfo.color} />
+                {singleRoleInfo.label}
+            </div>
+          )}
         </aside>
 
         {/* Main Content */}
